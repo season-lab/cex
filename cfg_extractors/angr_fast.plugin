@@ -1,0 +1,7 @@
+[Core]
+Name = AngrFast
+Module = angr_fast
+
+[Documentation]
+Description = Angr's CFG Extractor (Fast)
+Version = 1.0

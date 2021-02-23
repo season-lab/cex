@@ -1,0 +1,7 @@
+[Core]
+Name = AngrEmulated
+Module = angr_emulated
+
+[Documentation]
+Description = Angr's CFG Extractor (Emulated)
+Version = 1.0
