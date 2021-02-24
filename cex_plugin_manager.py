@@ -14,7 +14,7 @@ class CexPluginManager(PluginManager):
         self.manager.collectPlugins()
 
     def get_plugin_names(self):
-        pass
+        return list(map(lambda p: p.name, self.manager.getAllPlugins()))
 
-    def get_plugin_by_name(self):
-        pass
+    def get_plugin_by_name(self, name):
+        return self.manager.getPluginByName(name).plugin_object

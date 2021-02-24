@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import os
+
+try:
+    from cex import CEX
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from cex import CEX
+
+def get_plugins():
+    cex = CEX()
+    return "Plugins: " + " ".join(cex.pm.get_plugin_names())
+
+def dump_dot_cg(addr, graph, outdir=None):
+    dot = CEX.to_dot(graph)
+    if outdir is None:
+        print(dot)
+        return
+
+    with open(os.path.join(outdir, "cg-%s.dot" % addr)) as fout:
+        fout.write(dot)
+
+def dump_dot_cfg(graph, outdir=None):
+    dot = CEX.to_dot(graph)
+    if outdir is None:
+        print(dot)
+        return
+
+    with open(os.path.join(outdir, "cfg-%s.dot" % addr)) as fout:
+        fout.write(dot)
+
+def to_num(addr):
+    if addr[:2] == "0x":
+        return int(addr, 16)
+    return int(addr)
+
+def main(args):
+    cex = CEX()
+
+    plugins = None
+    if args.use_plugins is not None:
+        plugins = args.use_plugins
+
+    binary = args.binary
+    cgs    = args.dump_dot_cg or []
+    cfgs   = args.dump_dot_cfg or []
+    for cg_addr in cgs:
+        if cg_addr == "-":
+            cg_addr = None
+        else:
+            cg_addr = to_num(cg_addr)
+        graph = cex.get_callgraph(binary, cg_addr, plugins)
+        dump_dot_cg(str(cg_addr), graph, args.output)
+
+    for cfg_addr in cfgs:
+        graph = cex.get_cfg(binary, to_num(cfg_addr), plugins)
+        dump_dot_cg(cfg_addr, graph, args.output)
+
+    return 0
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(description='Cfg EXtractor')
+    parser.add_argument("--list-plugins", help="Print the installed plugins", action="version", version=get_plugins())
+    parser.add_argument("--use-plugins", metavar="PLUGIN", help="Comma separated list of plugins to use. If omitted, use %s." % CEX.default_plugin, nargs="*")
+    parser.add_argument("--output", metavar="DIRECTORY", help="Output directory. If omitted, stdout")
+    parser.add_argument("--dump-dot-cg", metavar="ADDR", help="Dump the callgraph from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
+    parser.add_argument("--dump-dot-cfg", metavar="ADDR", help="Dump the control flow graph of the function at address ADDR", nargs="*")
+    parser.add_argument("binary", help="The binary to analyze")
+
+    args = parser.parse_args()
+    # print(args)
+
+    exit(main(args))

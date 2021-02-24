@@ -7,7 +7,7 @@ class CFGNodeData(object):
         self.code = code
 
     def get_dot_label(self):
-        return "\l".join(code)
+        return "\l".join(self.code) + "\l"
 
     def __str__(self):
         return "<CFGNode %#x>" % self.addr
@@ -26,32 +26,11 @@ class CGNodeData(object):
 
 
 class ICfgExtractor(IPlugin):
-    def __init__(self, binary=None):
+    def __init__(self):
         super().__init__()
-        self.binary = binary
 
-    def get_callgraph(self, entry=None):
+    def get_callgraph(self, binary, entry=None):
         raise NotImplementedError
 
-    def get_cfg(self, addr):
+    def get_cfg(self, binary, addr):
         raise NotImplementedError
-
-    @staticmethod
-    def to_dot(graph, filename):
-        header = "digraph {\n\tnode [shape=box];\n"
-        footer = "}\n"
-
-        body = ""
-        for node_id in graph.nodes:
-            node = graph.nodes[node_id]
-            body += "\tnode_%x [label=\"%s\"];\n" % (node["data"].addr, node["data"].get_dot_label())
-        body += "\n"
-        for src_id, dst_id in graph.edges:
-            src = graph.nodes[src_id]
-            dst = graph.nodes[dst_id]
-            body += "\tnode_%x -> node_%x;\n" % (src["data"].addr, dst["data"].addr)
-
-        with open(filename, "w") as fout:
-            fout.write(header)
-            fout.write(body)
-            fout.write(footer)

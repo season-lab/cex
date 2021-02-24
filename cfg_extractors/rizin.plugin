@@ -1,0 +1,7 @@
+[Core]
+Name = Rizin
+Module = rizin_plugin
+
+[Documentation]
+Description = Rizin's CFG Extractor
+Version = 1.0

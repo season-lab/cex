@@ -2,6 +2,7 @@ import angr
 import networkx as nx
 
 from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor
+from cfg_extractors.angr_plugin.graph_utils import to_supergraph
 
 
 class BinaryData(object):
@@ -63,16 +64,20 @@ class AngrCfgExtractor(ICfgExtractor):
             fun = self.data[binary].angr_cfg.functions[addr]
             g   = nx.DiGraph()
 
-            for node in fun.graph.nodes:
-                g.add_node(node_addr, data=CFGNodeData(
-                    addr=node_addr,
-                    code=list(map(str, fun.get_block(node_addr).capstone.insns))))
+            fun_cfg   = to_supergraph(fun.transition_graph_ex(exception_edges=True))
+            fun_edges = [
+                (src, dst) for (src, dst, data) in fun_cfg.edges(data=True) 
+                    if data['type'] not in ('call', 'return_from_call')]
 
-            for src, dst in fun.graph.edges:
+            for src, dst in fun_edges:
                 if src.addr not in g.nodes:
-                    add_node(src.addr)
+                    g.add_node(src.addr, data=CFGNodeData(
+                        addr=src.addr,
+                        code=list(map(str, fun.get_block(src.addr, src.size).capstone.insns))))
                 if dst.addr not in g.nodes:
-                    add_node(dst.addr)
+                    g.add_node(dst.addr, data=CFGNodeData(
+                        addr=dst.addr,
+                        code=list(map(str, fun.get_block(dst.addr, dst.size).capstone.insns))))
                 g.add_edge(src.addr, dst.addr)
 
             self.data[binary].cfg[addr] = g
@@ -86,9 +91,9 @@ class AngrCfgExtractor(ICfgExtractor):
 
         return self.data[binary].cg[entry]
 
-    def get_cfg(self, addr):
+    def get_cfg(self, binary, addr):
         self._build_project(binary)
         if addr not in self.data[binary].cfg:
             self._build_cfg(binary, addr)
 
-        return self.data[binary].cfg[entry]
+        return self.data[binary].cfg[addr]
