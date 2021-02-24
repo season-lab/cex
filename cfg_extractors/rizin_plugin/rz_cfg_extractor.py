@@ -4,6 +4,7 @@ import subprocess
 import networkx as nx
 
 from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor
+from cfg_extractors.elf_utils import check_pie
 
 
 class RZCfgExtractor(ICfgExtractor):
@@ -22,16 +23,9 @@ class RZCfgExtractor(ICfgExtractor):
         return self.faddr_cache[name]
 
     @staticmethod
-    def _check_pie(binary):
-        file_output = subprocess.check_output(["file", binary])
-        if b"LSB shared object" in file_output or b"LSB pie executable" in file_output:
-            return True
-        return False
-
-    @staticmethod
     def _open_rz(binary):
         flags=list()
-        if RZCfgExtractor._check_pie(binary):
+        if RZCfgExtractor.check_pie(binary):
             flags.append("-B 0x400000")
         rz = rzpipe.open(binary, flags=flags)
         return rz

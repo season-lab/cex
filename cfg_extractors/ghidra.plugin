@@ -1,0 +1,7 @@
+[Core]
+Name = Ghidra
+Module = ghidra_plugin
+
+[Documentation]
+Description = Ghidra's CFG Extractor
+Version = 1.0

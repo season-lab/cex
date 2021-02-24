@@ -4,7 +4,7 @@ class CEX(object):
     default_plugin = "AngrFast"
 
     def __init__(self):
-        self.pm             = CexPluginManager()
+        self.pm = CexPluginManager()
 
     def get_callgraph(self, binary, entry=None, plugins=None):
         plugins = plugins or [self.default_plugin]
