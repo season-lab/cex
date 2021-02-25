@@ -2,9 +2,10 @@ from yapsy.IPlugin import IPlugin
 
 
 class CFGNodeData(object):
-    def __init__(self, addr: int, code: list):
-        self.addr = addr
-        self.code = code
+    def __init__(self, addr: int, code: list, calls=None):
+        self.addr  = addr
+        self.code  = code
+        self.calls = calls
 
     def get_dot_label(self):
         return "\l".join(self.code) + "\l"

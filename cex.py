@@ -29,8 +29,11 @@ class CEX(object):
 
     @staticmethod
     def to_dot(graph):
-        header = "digraph {\n\tnode [shape=box];\n"
-        footer = "}\n"
+        header  = "digraph {\n\tnode [shape=box];\n"
+        header += "\tgraph [fontname = \"monospace\"];\n"
+        header += "\tnode  [fontname = \"monospace\"];\n"
+        header += "\tedge  [fontname = \"monospace\"];\n"
+        footer  = "}\n"
 
         body = ""
         for node_id in graph.nodes:

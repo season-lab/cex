@@ -25,7 +25,7 @@ class RZCfgExtractor(ICfgExtractor):
     @staticmethod
     def _open_rz(binary):
         flags=list()
-        if RZCfgExtractor.check_pie(binary):
+        if check_pie(binary):
             flags.append("-B 0x400000")
         rz = rzpipe.open(binary, flags=flags)
         return rz
@@ -73,17 +73,21 @@ class RZCfgExtractor(ICfgExtractor):
 
         for block in cfg["blocks"]:
             addr = block["offset"]
+
+            calls = list()
+            if "refs" in block:
+                for ref_raw in block["refs"]:
+                    if ref_raw["type"] == "CALL":
+                        calls.append(int(ref_raw["addr"]))
+
             code = list(map(
                 lambda op: "%#x : %s" % (op["offset"], op["disasm"]),
                 block["ops"]
             ))
-            g.add_node(addr, data=CFGNodeData(addr=addr, code=code))
+            g.add_node(addr, data=CFGNodeData(addr=addr, code=code, calls=calls))
 
         for block in cfg["blocks"]:
             addr = block["offset"]
-            if addr not in g.nodes:
-                sys.stderr.write("WARNING: %#x not in nodes\n" % addr)
-                continue
 
             if "jump" in block:
                 dst = block["jump"]
