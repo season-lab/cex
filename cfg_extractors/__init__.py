@@ -2,7 +2,7 @@ from yapsy.IPlugin import IPlugin
 
 
 class CFGNodeData(object):
-    def __init__(self, addr: int, code: list, calls=None):
+    def __init__(self, addr: int, code: list, calls: list):
         self.addr  = addr
         self.code  = code
         self.calls = calls

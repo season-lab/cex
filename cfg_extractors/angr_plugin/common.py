@@ -69,15 +69,23 @@ class AngrCfgExtractor(ICfgExtractor):
                 (src, dst) for (src, dst, data) in fun_cfg.edges(data=True) 
                     if data['type'] not in ('call', 'return_from_call')]
 
+            def add_node(node):
+                calls = list()
+                n     = fun.get_node(node.addr)
+                for el in n.successors():
+                    if el.__class__.__name__ == "Function":
+                        calls.append(el.addr)
+
+                g.add_node(node.addr, data=CFGNodeData(
+                    addr=node.addr,
+                    code=list(map(str, fun.get_block(node.addr, node.size).capstone.insns)),
+                    calls=calls))
+
             for src, dst in fun_edges:
                 if src.addr not in g.nodes:
-                    g.add_node(src.addr, data=CFGNodeData(
-                        addr=src.addr,
-                        code=list(map(str, fun.get_block(src.addr, src.size).capstone.insns))))
+                    add_node(src)
                 if dst.addr not in g.nodes:
-                    g.add_node(dst.addr, data=CFGNodeData(
-                        addr=dst.addr,
-                        code=list(map(str, fun.get_block(dst.addr, dst.size).capstone.insns))))
+                    add_node(dst)
                 g.add_edge(src.addr, dst.addr)
 
             self.data[binary].cfg[addr] = g
