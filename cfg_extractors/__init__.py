@@ -1,5 +1,9 @@
 from yapsy.IPlugin import IPlugin
 
+class FunctionNotFoundException(Exception):
+    def __init__(self, addr):
+        super().__init__("Function @ %#x not found" % addr)
+
 
 class CFGNodeData(object):
     def __init__(self, addr: int, code: list, calls: list):
@@ -29,6 +33,9 @@ class CGNodeData(object):
 class ICfgExtractor(IPlugin):
     def __init__(self):
         super().__init__()
+
+    def loadable(self):
+        return True
 
     def get_callgraph(self, binary, entry=None):
         raise NotImplementedError

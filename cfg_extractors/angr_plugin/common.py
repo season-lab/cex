@@ -1,7 +1,7 @@
 import angr
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor
+from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor, FunctionNotFoundException
 from cfg_extractors.angr_plugin.graph_utils import to_supergraph
 
 
@@ -58,7 +58,7 @@ class AngrCfgExtractor(ICfgExtractor):
         self._build_angr_cfg_cg(binary)
 
         if addr not in self.data[binary].angr_cfg.functions:
-            raise Exception("No function at address %#x" % addr)
+            raise FunctionNotFoundException(addr)
 
         if addr not in self.data[binary].cfg:
             fun = self.data[binary].angr_cfg.functions[addr]

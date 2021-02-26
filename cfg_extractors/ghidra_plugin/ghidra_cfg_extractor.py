@@ -52,6 +52,9 @@ class GhidraCfgExtractor(ICfgExtractor):
 
         self.data = dict()
 
+    def loadable(self):
+        return "GHIDRA_HOME" in os.environ
+
     @staticmethod
     def _get_cmd_callgraph(binary):
         ghidra_home = os.environ["GHIDRA_HOME"]
@@ -109,6 +112,8 @@ class GhidraCfgExtractor(ICfgExtractor):
 
         if entry is None:
             return cg
+        if entry not in cg.nodes:
+            return nx.null_graph()
         return nx.ego_graph(cg, entry, radius=sys.maxsize)
 
     def get_cfg(self, binary, addr):

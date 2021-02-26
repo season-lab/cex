@@ -30,6 +30,13 @@ class RZCfgExtractor(ICfgExtractor):
         rz = rzpipe.open(binary, flags=flags)
         return rz
 
+    def loadable(self):
+        try:
+            subprocess.check_call(["rz", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except:
+            return False
+
     def get_callgraph(self, binary, entry=None):
         self.faddr_cache = dict()
 
@@ -59,8 +66,10 @@ class RZCfgExtractor(ICfgExtractor):
                 g.add_edge(off, called_off)
 
         rz.quit()
-        if entry is None:
+        if entry is None or nx.number_of_nodes(g) == 0:
             return g
+        if entry not in g.nodes:
+            return nx.null_graph()
         return nx.ego_graph(g, entry, radius=sys.maxsize)
 
     def get_cfg(self, binary, addr):
@@ -75,10 +84,11 @@ class RZCfgExtractor(ICfgExtractor):
             addr = block["offset"]
 
             calls = list()
-            if "refs" in block:
-                for ref_raw in block["refs"]:
-                    if ref_raw["type"] == "CALL":
-                        calls.append(int(ref_raw["addr"]))
+            for op in block["ops"]:
+                if "refs" in op:
+                    for ref_raw in op["refs"]:
+                        if ref_raw["type"] == "CALL":
+                            calls.append(int(ref_raw["addr"]))
 
             code = list(map(
                 lambda op: "%#x : %s" % (op["offset"], op["disasm"]),

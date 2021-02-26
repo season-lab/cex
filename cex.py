@@ -1,4 +1,7 @@
+import networkx as nx
+
 from cex_plugin_manager import CexPluginManager
+
 
 class CEX(object):
     default_plugin = "AngrFast"
@@ -19,6 +22,27 @@ class CEX(object):
 
         graphs = list(map(lambda p: p.get_cfg(binary, addr), plugins))
         return CEX.merge_graphs(*graphs)
+
+    def find_path(self, binary, src_addr, dst_addr, plugins=None, include_cfgs=True):
+        callgraph = self.get_callgraph(binary, src_addr, plugins)
+        if nx.number_of_nodes(callgraph) == 0 or dst_addr not in callgraph:
+            return []
+        cg_path = nx.shortest_path(callgraph, src_addr, dst_addr)
+        if not include_cfgs:
+            return list(map(lambda n_addr: callgraph.nodes[n_addr]["data"], cg_path))
+
+        def find_path_in_cfg(fun_addr, callee):
+            cfg = self.get_cfg(binary, fun_addr, plugins)
+            assert cfg is not None # this should not happen, since the functions are taken from the CG
+
+            node_callee = list(filter(lambda n_addr: callee in cfg.nodes[n_addr]["data"].calls, cfg.nodes))[0]
+            return list(map(lambda n_addr: cfg.nodes[n_addr]["data"], nx.shortest_path(cfg, fun_addr, node_callee)))
+
+        path = list()
+        for i in range(len(cg_path)-1):
+            src, dst = cg_path[i:i+2]
+            path    += find_path_in_cfg(src, dst)
+        return path
 
     @staticmethod
     def merge_graphs(*graphs):

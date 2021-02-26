@@ -12,9 +12,13 @@ class CexPluginManager(PluginManager):
             plugin_info_ext="plugin"
         )
         self.manager.collectPlugins()
+        self.plugin_dict = dict()
+        for p in self.manager.getAllPlugins():
+            if p.plugin_object.loadable():
+                self.plugin_dict[p.name] = p.plugin_object
 
     def get_plugin_names(self):
-        return list(map(lambda p: p.name, self.manager.getAllPlugins()))
+        return list(self.plugin_dict.keys())
 
     def get_plugin_by_name(self, name):
-        return self.manager.getPluginByName(name).plugin_object
+        return self.plugin_dict[name]
