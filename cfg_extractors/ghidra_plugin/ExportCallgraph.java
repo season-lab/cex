@@ -60,6 +60,8 @@ public class ExportCallgraph extends HeadlessScript {
           "    \"calls\": [\n",
             f.getName(), f.getEntryPoint().getOffset());
 
+        // Inaccurato: sembra mettere tra "calledFunctions" anche riferimenti a funzioni
+        //             (e.g., puntatore a funzione salvato su stack)
         Set<Function> called_functions = f.getCalledFunctions(monitor);
         Iterator<Function> iter_called = called_functions.iterator();
         while (iter_called.hasNext()) {
