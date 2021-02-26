@@ -8,6 +8,8 @@ from cfg_extractors.elf_utils import check_pie
 
 
 class RZCfgExtractor(ICfgExtractor):
+    SPLIT_BLOCKS_AT_CALLS = True
+
     def __init__(self):
         super().__init__()
         self.faddr_cache = dict()
@@ -28,6 +30,9 @@ class RZCfgExtractor(ICfgExtractor):
         if check_pie(binary):
             flags.append("-B 0x400000")
         rz = rzpipe.open(binary, flags=flags)
+        rz.cmd("e analysis.jmp.tbl=true")   # | jmp table detection (experimental)
+        rz.cmd("e analysis.jmp.indir=true") # | https://book.rizin.re/analysis/code_analysis.html#jump-tables
+        rz.cmd("e analysis.datarefs=true")  # |
         return rz
 
     def loadable(self):
@@ -80,37 +85,57 @@ class RZCfgExtractor(ICfgExtractor):
         cfg = rz.cmdj("agj @ %#x" % addr)[0]
         g   = nx.DiGraph()
 
+        edges = list()
         for block in cfg["blocks"]:
             addr = block["offset"]
 
-            calls = list()
-            for op in block["ops"]:
+            code = list()
+            ops_with_call = list()
+            for i, op in enumerate(block["ops"]):
                 if "refs" in op:
                     for ref_raw in op["refs"]:
                         if ref_raw["type"] == "CALL":
-                            calls.append(int(ref_raw["addr"]))
+                            ops_with_call.append((i, int(ref_raw["addr"])))
+                code.append("%#x : %s" % (op["offset"], op["disasm"]))
 
-            code = list(map(
-                lambda op: "%#x : %s" % (op["offset"], op["disasm"]),
-                block["ops"]
-            ))
-            g.add_node(addr, data=CFGNodeData(addr=addr, code=code, calls=calls))
+            if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
+                prev_op = 0
+                for op_idx, call_target in ops_with_call:
+                    op_addr    = addr
+                    next_op    = op_idx + 1
+                    code_slice = code[prev_op:next_op]
+                    calls      = [call_target]
 
-        for block in cfg["blocks"]:
-            addr = block["offset"]
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, code=code_slice, calls=calls))
+                    if next_op < len(block["ops"]):
+                        addr = block["ops"][next_op]["offset"]
+                        edges.append((op_addr, addr))
+                    prev_op = next_op
+
+                if next_op < len(code):
+                    op_addr    = addr
+                    code_slice = code[next_op:]
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, code=code_slice, calls=[]))
+
+            else:
+                calls = list(map(lambda x: x[1], ops_with_call))
+                g.add_node(addr, data=CFGNodeData(addr=addr, code=code, calls=calls))
 
             if "jump" in block:
                 dst = block["jump"]
-                if dst not in g.nodes:
-                    sys.stderr.write("WARNING: %#x not in nodes\n" % dst)
-                else:
-                    g.add_edge(addr, dst)
+                edges.append((addr, dst))
             if "fail" in block:
                 dst = block["fail"]
-                if dst not in g.nodes:
-                    sys.stderr.write("WARNING: %#x not in nodes\n" % dst)
-                else:
-                    g.add_edge(addr, dst)
+                edges.append((addr, dst))
+
+        for src, dst in edges:
+            if src not in g.nodes:
+                sys.stderr.write("WARNING: %#x not in nodes\n" % src)
+                continue
+            if dst not in g.nodes:
+                sys.stderr.write("WARNING: %#x not in nodes\n" % dst)
+                continue
+            g.add_edge(src, dst)
 
         rz.quit()
         return g
