@@ -1,5 +1,7 @@
 import sys
+import os
 import rzpipe
+import hashlib
 import subprocess
 import networkx as nx
 
@@ -9,6 +11,7 @@ from cfg_extractors.elf_utils import check_pie
 
 class RZCfgExtractor(ICfgExtractor):
     SPLIT_BLOCKS_AT_CALLS = True
+    USE_PROJECTS          = False
 
     def __init__(self):
         super().__init__()
@@ -24,15 +27,29 @@ class RZCfgExtractor(ICfgExtractor):
             self.faddr_cache[name] = addr
         return self.faddr_cache[name]
 
-    @staticmethod
-    def _open_rz(binary):
-        flags=list()
-        if check_pie(binary):
-            flags.append("-B 0x400000")
-        rz = rzpipe.open(binary, flags=flags)
-        rz.cmd("e analysis.jmp.tbl=true")   # | jmp table detection (experimental)
-        rz.cmd("e analysis.jmp.indir=true") # | https://book.rizin.re/analysis/code_analysis.html#jump-tables
-        rz.cmd("e analysis.datarefs=true")  # |
+    def _open_rz(self, binary):
+        with open(binary,'rb') as f_binary:
+            binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
+        proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
+
+        if not USE_PROJECTS or not os.path.exists(proj_name):
+            flags=list()
+            if check_pie(binary):
+                flags.append("-B 0x400000")
+            rz = rzpipe.open(binary, flags=flags)
+            # rz.cmd("e analysis.jmp.tbl=true")   # | jmp table detection (experimental)
+            # rz.cmd("e analysis.jmp.indir=true") # | https://book.rizin.re/analysis/code_analysis.html#jump-tables
+            # rz.cmd("e analysis.datarefs=true")  # |
+            rz.cmd("aaaa")  # run also emulation stage
+
+            if USE_PROJECTS:
+                with open(binary,'rb') as f_binary:
+                    binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
+                proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
+                rz.cmd("Ps %s" % proj_name)
+        else:
+            rz = rzpipe.open(binary)
+            rz.cmd("Po %s" % proj_name)
         return rz
 
     def loadable(self):
@@ -45,9 +62,7 @@ class RZCfgExtractor(ICfgExtractor):
     def get_callgraph(self, binary, entry=None):
         self.faddr_cache = dict()
 
-        rz = RZCfgExtractor._open_rz(binary)
-        rz.cmd("aaaa")  # run also emulation stage
-
+        rz = self._open_rz(binary)
         cg = rz.cmdj("agCj")
         g  = nx.DiGraph()
 
@@ -78,10 +93,9 @@ class RZCfgExtractor(ICfgExtractor):
         return nx.ego_graph(g, entry, radius=sys.maxsize)
 
     def get_cfg(self, binary, addr):
+        self.faddr_cache = dict()
 
-        rz = RZCfgExtractor._open_rz(binary)
-        rz.cmd("aaaa")  # run also emulation stage
-
+        rz  = self._open_rz(binary)
         cfg = rz.cmdj("agj @ %#x" % addr)[0]
         g   = nx.DiGraph()
 

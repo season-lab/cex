@@ -19,7 +19,7 @@ class GhidraBinaryData(object):
 class GhidraCfgExtractor(ICfgExtractor):
     CMD_CALLGRAPH = [
         "$GHIDRA_HOME/support/analyzeHeadless",
-        "/tmp/cex_projects",
+        "/dev/shm",
         "Test.gpr",
         "-import",
         "$BINARY",
@@ -32,7 +32,7 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     CMD_CFG = [
         "$GHIDRA_HOME/support/analyzeHeadless",
-        "/tmp/cex_projects",
+        "$PROJ_FOLDER",
         "$PROJ_NAME",
         "-import",
         "$BINARY",
@@ -51,9 +51,6 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     def __init__(self):
         super().__init__()
-
-        if not os.path.exists("/tmp/cex_projects"):
-            os.mkdir("/tmp/cex_projects")
         self.data = dict()
 
     def loadable(self):
@@ -74,8 +71,7 @@ class GhidraCfgExtractor(ICfgExtractor):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
 
-    @staticmethod
-    def _get_cmd_cfg(binary):
+    def _get_cmd_cfg(self, binary):
         ghidra_home = os.environ["GHIDRA_HOME"]
         cmd = GhidraCfgExtractor.CMD_CFG[:]
 
@@ -83,10 +79,11 @@ class GhidraCfgExtractor(ICfgExtractor):
             binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
         proj_name = "ghidra_proj_" + binary_md5  + ".gpr"
         for i in range(len(cmd)):
-            cmd[i] = cmd[i]                           \
-                .replace("$GHIDRA_HOME", ghidra_home) \
-                .replace("$BINARY", binary)           \
-                .replace("$PROJ_NAME", proj_name)     \
+            cmd[i] = cmd[i]                                     \
+                .replace("$GHIDRA_HOME", ghidra_home)           \
+                .replace("$BINARY", binary)                     \
+                .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
+                .replace("$PROJ_NAME", proj_name)               \
                 .replace("$OUTFILE", "/dev/shm/cfg.json")
 
         if check_pie(binary):
@@ -130,7 +127,7 @@ class GhidraCfgExtractor(ICfgExtractor):
             self.data[binary] = GhidraBinaryData()
 
         if self.data[binary].cfg_raw is None:
-            cmd = GhidraCfgExtractor._get_cmd_cfg(binary)
+            cmd = self._get_cmd_cfg(binary)
             subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
 
             with open("/dev/shm/cfg.json", "r") as fin:

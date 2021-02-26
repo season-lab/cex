@@ -1,5 +1,7 @@
 from yapsy.IPlugin import IPlugin
 
+import os
+
 class FunctionNotFoundException(Exception):
     def __init__(self, addr):
         super().__init__("Function @ %#x not found" % addr)
@@ -33,6 +35,8 @@ class CGNodeData(object):
 class ICfgExtractor(IPlugin):
     def __init__(self):
         super().__init__()
+        if not os.path.exists(self.get_tmp_folder()):
+            os.mkdir(self.get_tmp_folder())
 
     def loadable(self):
         return True
@@ -42,3 +46,6 @@ class ICfgExtractor(IPlugin):
 
     def get_cfg(self, binary, addr):
         raise NotImplementedError
+
+    def get_tmp_folder(self):
+        return "/tmp/cex_projects"
