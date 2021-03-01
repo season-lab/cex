@@ -32,7 +32,7 @@ class RZCfgExtractor(ICfgExtractor):
             binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
         proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
 
-        if not USE_PROJECTS or not os.path.exists(proj_name):
+        if not RZCfgExtractor.USE_PROJECTS or not os.path.exists(proj_name):
             flags=list()
             if check_pie(binary):
                 flags.append("-B 0x400000")
@@ -42,7 +42,7 @@ class RZCfgExtractor(ICfgExtractor):
             # rz.cmd("e analysis.datarefs=true")  # |
             rz.cmd("aaaa")  # run also emulation stage
 
-            if USE_PROJECTS:
+            if RZCfgExtractor.USE_PROJECTS:
                 with open(binary,'rb') as f_binary:
                     binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
                 proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
