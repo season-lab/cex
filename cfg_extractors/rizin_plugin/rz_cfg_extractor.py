@@ -5,7 +5,8 @@ import hashlib
 import subprocess
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor
+from cfg_extractors import (
+    CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor)
 from cfg_extractors.elf_utils import check_pie
 
 
@@ -103,37 +104,39 @@ class RZCfgExtractor(ICfgExtractor):
         for block in cfg["blocks"]:
             addr = block["offset"]
 
-            code = list()
+            insns         = list()
             ops_with_call = list()
             for i, op in enumerate(block["ops"]):
+                call_ref = None
                 if "refs" in op:
                     for ref_raw in op["refs"]:
                         if ref_raw["type"] == "CALL":
-                            ops_with_call.append((i, int(ref_raw["addr"])))
-                code.append("%#x : %s" % (op["offset"], op["disasm"]))
+                            call_ref = ref_raw["addr"]
+                            ops_with_call.append((i, call_ref))
+                insns.append(CFGInstruction(addr=op["offset"], call_ref=call_ref, mnemonic=op["disasm"]))
 
             if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
                 prev_op = 0
                 for op_idx, call_target in ops_with_call:
-                    op_addr    = addr
-                    next_op    = op_idx + 1
-                    code_slice = code[prev_op:next_op]
-                    calls      = [call_target]
+                    op_addr     = addr
+                    next_op     = op_idx + 1
+                    insns_slice = insns[prev_op:next_op]
+                    calls       = [call_target]
 
-                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, code=code_slice, calls=calls))
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=calls))
                     if next_op < len(block["ops"]):
                         addr = block["ops"][next_op]["offset"]
                         edges.append((op_addr, addr))
                     prev_op = next_op
 
-                if next_op < len(code):
-                    op_addr    = addr
-                    code_slice = code[next_op:]
-                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, code=code_slice, calls=[]))
+                if next_op < len(insns):
+                    op_addr     = addr
+                    insns_slice = insns[next_op:]
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=[]))
 
             else:
                 calls = list(map(lambda x: x[1], ops_with_call))
-                g.add_node(addr, data=CFGNodeData(addr=addr, code=code, calls=calls))
+                g.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
 
             if "jump" in block:
                 dst = block["jump"]

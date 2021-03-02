@@ -7,14 +7,24 @@ class FunctionNotFoundException(Exception):
         super().__init__("Function @ %#x not found" % addr)
 
 
+class CFGInstruction(object):
+    def __init__(self, addr: int, call_ref: int, mnemonic: str):
+        self.addr     = addr
+        self.mnemonic = mnemonic
+        self.call_ref = call_ref
+
+    def __str__(self):
+        return "%#x : %s" % (self.addr, self.mnemonic)
+
+
 class CFGNodeData(object):
-    def __init__(self, addr: int, code: list, calls: list):
+    def __init__(self, addr: int, insns: list, calls: list):
         self.addr  = addr
-        self.code  = code
+        self.insns = insns
         self.calls = calls
 
     def get_dot_label(self):
-        return "\l".join(self.code) + "\l"
+        return "\l".join(map(str, self.insns)) + "\l"
 
     def __str__(self):
         return "<CFGNode %#x>" % self.addr

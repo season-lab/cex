@@ -5,7 +5,7 @@ import hashlib
 import subprocess
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor
+from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
 from cfg_extractors.elf_utils import check_pie
 
 
@@ -174,9 +174,15 @@ class GhidraCfgExtractor(ICfgExtractor):
         cfg = nx.DiGraph()
         for block_raw in target_fun["blocks"]:
             addr  = int(block_raw["addr"], 16)
-            code  = block_raw["instructions"]
+            insns = list()
+            for insn in block_raw["instructions"]:
+                insns.append(CFGInstruction(addr=int(insn["addr"], 16), call_ref=None, mnemonic=insn["mnemonic"]))
             calls = list(map(lambda x: int(x, 16), block_raw["calls"]))
-            cfg.add_node(addr, data=CFGNodeData(addr=addr, code=code, calls=calls))
+
+            assert len(calls) < 2  # should always be the case, since blocks are splitted at calls
+            if len(calls) == 1:
+                insns[-1].call_ref = calls[0]
+            cfg.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
 
         for block_raw in target_fun["blocks"]:
             src = int(block_raw["addr"], 16)

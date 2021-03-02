@@ -83,7 +83,7 @@ public class ExportCFG extends HeadlessScript {
                 InstructionIterator iter = currentProgram.getListing().getInstructions(block, true);
                 while (iter.hasNext()) {
                     Instruction inst = iter.next();
-                    pout.format("        \"%#x : %s\"", inst.getAddress().getOffset(), inst.toString());
+                    pout.format("        { \"addr\": \"%#x\", \"mnemonic\" : \"%s\" }", inst.getAddress().getOffset(), inst.toString());
                     if (iter.hasNext())
                         pout.format(",\n");
                     else

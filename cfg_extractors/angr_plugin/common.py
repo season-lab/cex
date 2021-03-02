@@ -1,7 +1,7 @@
 import angr
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CGNodeData, ICfgExtractor, FunctionNotFoundException
+from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, FunctionNotFoundException
 from cfg_extractors.angr_plugin.graph_utils import to_supergraph
 
 
@@ -64,10 +64,10 @@ class AngrCfgExtractor(ICfgExtractor):
             fun = self.data[binary].angr_cfg.functions[addr]
             g   = nx.DiGraph()
 
-            fun_cfg   = to_supergraph(fun.transition_graph_ex(exception_edges=True))
-            fun_edges = [
-                (src, dst) for (src, dst, data) in fun_cfg.edges(data=True) 
-                    if data['type'] not in ('call', 'return_from_call')]
+            # fun_cfg   = to_supergraph(fun.transition_graph_ex(exception_edges=True))
+            # fun_edges = [
+            #     (src, dst) for (src, dst, data) in fun_cfg.edges(data=True) 
+            #         if data['type'] not in ('call', 'return_from_call')]
 
             def add_node(node):
                 calls = list()
@@ -76,17 +76,26 @@ class AngrCfgExtractor(ICfgExtractor):
                     if el.__class__.__name__ == "Function":
                         calls.append(el.addr)
 
+                insns = list()
+                for insn in fun.get_block(node.addr, node.size).capstone.insns:
+                    mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
+                    insns.append(CFGInstruction(addr=insn.insn.address, call_ref=None, mnemonic=mnemonic))
+
+                assert len(calls) < 2 # should always be the case, since blocks are splitted at calls
+                if len(calls) == 1:
+                    insns[-1].call_ref = calls[0]
+
                 g.add_node(node.addr, data=CFGNodeData(
                     addr=node.addr,
-                    code=list(map(str, fun.get_block(node.addr, node.size).capstone.insns)),
+                    insns=insns,
                     calls=calls))
 
-            for src, dst in fun_edges:
-                if src.addr not in g.nodes:
-                    add_node(src)
-                if dst.addr not in g.nodes:
-                    add_node(dst)
-                g.add_edge(src.addr, dst.addr)
+            for block_src, block_dst in fun.graph.edges:
+                if block_src.addr not in g.nodes:
+                    add_node(block_src)
+                if block_dst.addr not in g.nodes:
+                    add_node(block_dst)
+                g.add_edge(block_src.addr, block_dst.addr)
 
             self.data[binary].cfg[addr] = g
 
