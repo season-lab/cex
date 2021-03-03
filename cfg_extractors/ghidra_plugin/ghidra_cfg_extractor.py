@@ -17,24 +17,12 @@ class GhidraBinaryData(object):
 
 
 class GhidraCfgExtractor(ICfgExtractor):
-    CMD_CALLGRAPH = [
-        "$GHIDRA_HOME/support/analyzeHeadless",
-        "/dev/shm",
-        "Test.gpr",
-        "-import",
-        "$BINARY",
-        "-postScript",
-        "ExportCallgraph.java",
-        "$OUTFILE",
-        "-deleteProject",
-        "-scriptPath",
-        os.path.realpath(os.path.dirname(__file__))]
 
     CMD_CFG = [
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-import",
+        "$GHIDRA_OP",  # either -process (if the project exists) or import
         "$BINARY",
         "-postScript",
         "ExportCFG.java",
@@ -78,49 +66,23 @@ class GhidraCfgExtractor(ICfgExtractor):
         with open(binary,'rb') as f_binary:
             binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
         proj_name = "ghidra_proj_" + binary_md5  + ".gpr"
+        ghidra_op = "-import"
+        if os.path.exists(os.path.join(self.get_tmp_folder(), proj_name)):
+            ghidra_op = "-process"
+            binary = os.path.basename(binary)
+
         for i in range(len(cmd)):
             cmd[i] = cmd[i]                                     \
                 .replace("$GHIDRA_HOME", ghidra_home)           \
                 .replace("$BINARY", binary)                     \
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
+                .replace("$GHIDRA_OP", ghidra_op)               \
                 .replace("$OUTFILE", "/dev/shm/cfg.json")
 
         if check_pie(binary):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
-
-    def get_callgraph_with_script(self, binary, entry=None):
-        # Old function
-        if binary not in self.data:
-            self.data[binary] = GhidraBinaryData()
-
-        if self.data[binary].cg_raw is None:
-            cmd = GhidraCfgExtractor._get_cmd_callgraph(binary)
-            subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
-
-            with open("/dev/shm/cg.json", "r") as fin:
-                callgraph_raw = json.load(fin)
-
-            self.data[binary].cg_raw = callgraph_raw
-
-        cg = nx.DiGraph()
-        for node in self.data[binary].cg_raw:
-            addr = int(node["addr"], 16)
-            name = node["name"]
-            cg.add_node(addr, data=CGNodeData(addr=addr, name=name))
-
-        for node in self.data[binary].cg_raw:
-            src = int(node["addr"], 16)
-            for call in node["calls"]:
-                dst = int(call, 16)
-                cg.add_edge(src, dst)
-
-        if entry is None:
-            return cg
-        if entry not in cg.nodes:
-            return nx.null_graph()
-        return nx.ego_graph(cg, entry, radius=sys.maxsize)
 
     def _load_cfg_raw(self, binary):
         if binary not in self.data:
@@ -150,6 +112,12 @@ class GhidraCfgExtractor(ICfgExtractor):
                 for block_raw in fun_raw["blocks"]:
                     for call_raw in block_raw["calls"]:
                         dst = int(call_raw, 16)
+                        if src not in cg.nodes:
+                            sys.stderr.write("WARNING: %#x (src) not in nodes\n" % src)
+                            continue
+                        if dst not in cg.nodes:
+                            sys.stderr.write("WARNING: %#x (dst) not in nodes\n" % src)
+                            continue
                         cg.add_edge(src, dst)
             self.data[binary].cg = cg
 
@@ -190,4 +158,4 @@ class GhidraCfgExtractor(ICfgExtractor):
                 dst = int(dst_raw, 16)
                 cfg.add_edge(src, dst)
 
-        return cfg
+        return self.normalize_graph(cfg)

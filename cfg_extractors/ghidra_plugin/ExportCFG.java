@@ -54,9 +54,9 @@ public class ExportCFG extends HeadlessScript {
         pout.format("[\n");
         while (iter_functions.hasNext() && !monitor.isCancelled()) {
             Function f = iter_functions.next();
-            if (f.isExternal() || f.isThunk()) {
-                continue;
-            }
+            // if (f.isExternal() || f.isThunk()) {
+            //     continue;
+            // }
 
             if (!first_iter_functions)
                 pout.format(" },\n");

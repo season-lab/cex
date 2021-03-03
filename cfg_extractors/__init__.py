@@ -1,6 +1,7 @@
 from yapsy.IPlugin import IPlugin
 
 import os
+import networkx as nx
 
 class FunctionNotFoundException(Exception):
     def __init__(self, addr):
@@ -26,6 +27,10 @@ class CFGNodeData(object):
     def get_dot_label(self):
         return "\l".join(map(str, self.insns)) + "\l"
 
+    def join(self, other):
+        assert isinstance(other, CFGNodeData)
+        return CFGNodeData(self.addr, self.insns + other.insns, self.calls + other.calls)
+
     def __str__(self):
         return "<CFGNode %#x>" % self.addr
 
@@ -37,6 +42,10 @@ class CGNodeData(object):
 
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
+
+    def join(self, other):
+        # Does it makes sense in some circumstances?
+        raise NotImplementedError
 
     def __str__(self):
         return "<CGNode %s @ %#x>" % (self.name, self.addr)
@@ -59,3 +68,50 @@ class ICfgExtractor(IPlugin):
 
     def get_tmp_folder(self):
         return "/tmp/cex_projects"
+
+    @staticmethod
+    def normalize_graph(graph, merge_calls=False):
+        """ 
+            Merge nodes n1 and n2 if:
+              - n1 is the only (direct) predecessor of n2
+              - n2 is the only (direct) successor of n1
+              - the last instruction of n1 is not a call (only if merge_calls is False)
+        """
+        merged_nodes = dict()
+        out_graph    = nx.DiGraph()
+        for n_id in graph.nodes:
+            if n_id in merged_nodes:
+                continue
+
+            node_data  = graph.nodes[n_id]["data"]
+            successors = list(graph.successors(n_id))
+            if len(successors) != 1:
+                out_graph.add_node(n_id, data=node_data)
+                continue
+
+            unique_successor_id = successors[0]
+            predecessors = list(graph.predecessors(unique_successor_id))
+            if len(predecessors) != 1:
+                out_graph.add_node(n_id, data=node_data)
+                continue
+
+            assert predecessors[0] == n_id
+            if not merge_calls and isinstance(node_data, CFGNodeData) and \
+                    node_data.insns[-1].call_ref is not None:
+                out_graph.add_node(n_id, data=node_data)
+                continue
+
+            unique_successor_data = graph.nodes[unique_successor_id]["data"]
+            merged_nodes[unique_successor_id] = n_id
+            out_graph.add_node(n_id, data=node_data.join(unique_successor_data))
+
+        for src_id, dst_id in graph.edges:
+            if dst_id in merged_nodes:
+                # this edge is surely unique, and is the edge (n1, n2) where n1 and n2 has been merged. Delete this edge!
+                continue
+            if src_id in merged_nodes:
+                # this is an edge from the n2 to its successors, I want to preserve those edges. Keep them!
+                src_id = merged_nodes[src_id]
+            out_graph.add_edge(src_id, dst_id)
+
+        return out_graph

@@ -155,4 +155,4 @@ class RZCfgExtractor(ICfgExtractor):
             g.add_edge(src, dst)
 
         rz.quit()
-        return g
+        return self.normalize_graph(g)
