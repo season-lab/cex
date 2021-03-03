@@ -104,27 +104,30 @@ class ICfgExtractor(IPlugin):
             if n_id in merged_nodes:
                 continue
 
-            node_data  = graph.nodes[n_id]["data"]
-            successors = list(graph.successors(n_id))
-            if len(successors) != 1:
-                out_graph.add_node(n_id, data=node_data)
-                continue
+            orig_n_id = n_id
+            merged_node_data = graph.nodes[n_id]["data"]
+            while 1:
+                node_data  = graph.nodes[n_id]["data"]
+                successors = list(graph.successors(n_id))
+                if len(successors) != 1:
+                    break
 
-            unique_successor_id = successors[0]
-            predecessors = list(graph.predecessors(unique_successor_id))
-            if len(predecessors) != 1:
-                out_graph.add_node(n_id, data=node_data)
-                continue
+                unique_successor_id = successors[0]
+                predecessors = list(graph.predecessors(unique_successor_id))
+                if len(predecessors) != 1:
+                    break
 
-            assert predecessors[0] == n_id
-            if not merge_calls and isinstance(node_data, CFGNodeData) and \
-                    node_data.insns[-1].call_ref is not None:
-                out_graph.add_node(n_id, data=node_data)
-                continue
+                assert predecessors[0] == n_id
+                if not merge_calls and isinstance(node_data, CFGNodeData) and \
+                        node_data.insns[-1].call_ref is not None:
+                    break
 
-            unique_successor_data = graph.nodes[unique_successor_id]["data"]
-            merged_nodes[unique_successor_id] = n_id
-            out_graph.add_node(n_id, data=node_data.join(unique_successor_data))
+                unique_successor_data = graph.nodes[unique_successor_id]["data"]
+                merged_nodes[unique_successor_id] = orig_n_id
+                merged_node_data = merged_node_data.join(unique_successor_data)
+                n_id = unique_successor_id
+
+            out_graph.add_node(orig_n_id, data=merged_node_data)
 
         for src_id, dst_id in graph.edges:
             if dst_id in merged_nodes:
