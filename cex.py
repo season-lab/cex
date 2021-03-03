@@ -46,10 +46,26 @@ class CEX(object):
 
     @staticmethod
     def merge_graphs(*graphs):
-        # FIXME: todo
+        if len(graphs) == 1:
+            return graphs[0]
 
-        assert len(graphs) == 1
-        return graphs[0]
+        res_graph    = nx.DiGraph()
+        merged_nodes = dict()
+        for g in graphs:
+            for n_id in g.nodes:
+                node = g.nodes[n_id]["data"]
+                if n_id in merged_nodes:
+                    merged_nodes[n_id] = merged_nodes[n_id].merge(node)
+                else:
+                    merged_nodes[n_id] = node
+
+        for n_id in merged_nodes:
+            res_graph.add_node(n_id, data=merged_nodes[n_id])
+        for g in graphs:
+            for src_id, dst_id in g.edges:
+                res_graph.add_edge(src_id, dst_id)
+
+        return res_graph
 
     @staticmethod
     def to_dot(graph):

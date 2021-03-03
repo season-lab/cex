@@ -28,8 +28,24 @@ class CFGNodeData(object):
         return "\l".join(map(str, self.insns)) + "\l"
 
     def join(self, other):
+        " Append other instructions to self "
         assert isinstance(other, CFGNodeData)
         return CFGNodeData(self.addr, self.insns + other.insns, self.calls + other.calls)
+
+    def merge(self, other):
+        """
+        Return the block that has LESS instructions.
+         rationale:
+           If a graph has a block with less instructions, it is likely
+           that the block has been splitted, so the graph is more precise
+        """
+
+        assert isinstance(other, CFGNodeData)
+        assert self.addr == other.addr
+
+        if len(self.insns) <= len(other.insns):
+            return self
+        return other
 
     def __str__(self):
         return "<CFGNode %#x>" % self.addr
@@ -46,6 +62,11 @@ class CGNodeData(object):
     def join(self, other):
         # Does it makes sense in some circumstances?
         raise NotImplementedError
+
+    def merge(self, other):
+        assert isinstance(other, CGNodeData)
+        assert self.addr == other.addr
+        return self
 
     def __str__(self):
         return "<CGNode %s @ %#x>" % (self.name, self.addr)
