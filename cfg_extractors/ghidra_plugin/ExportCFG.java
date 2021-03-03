@@ -68,6 +68,10 @@ public class ExportCFG extends HeadlessScript {
             pout.format("  \"addr\": \"%#x\",\n", f.getEntryPoint().getOffset());
             pout.format("  \"blocks\": [\n");
             CodeBlock entry_block  = model.getCodeBlockAt(f.getEntryPoint(), monitor);
+            if (entry_block == null) {
+                pout.format("  ]\n");
+                continue;
+            }
 
             Stack<CodeBlock> stack = new Stack<>();
             Set<CodeBlock> visited = new HashSet<>();
