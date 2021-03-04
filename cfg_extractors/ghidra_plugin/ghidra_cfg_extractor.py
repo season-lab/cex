@@ -1,12 +1,11 @@
 import os
 import sys
 import json
-import hashlib
 import subprocess
 import networkx as nx
 
 from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
-from cfg_extractors.elf_utils import check_pie
+from cfg_extractors.utils import check_pie, get_md5_file
 
 
 class GhidraBinaryData(object):
@@ -59,14 +58,13 @@ class GhidraCfgExtractor(ICfgExtractor):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
 
-    def _get_cmd_cfg(self, binary):
+    def _get_cmd_cfg(self, binary, outfile):
         ghidra_home = os.environ["GHIDRA_HOME"]
         cmd = GhidraCfgExtractor.CMD_CFG[:]
 
-        with open(binary,'rb') as f_binary:
-            binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
-        proj_name = "ghidra_proj_" + binary_md5  + ".gpr"
-        ghidra_op = "-import"
+        binary_md5 = get_md5_file(binary)
+        proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
+        ghidra_op  = "-import"
         if os.path.exists(os.path.join(self.get_tmp_folder(), proj_name)):
             ghidra_op = "-process"
             binary = os.path.basename(binary)
@@ -78,7 +76,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
                 .replace("$GHIDRA_OP", ghidra_op)               \
-                .replace("$OUTFILE", "/dev/shm/cfg.json")
+                .replace("$OUTFILE", outfile)
 
         if check_pie(binary):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
@@ -89,10 +87,14 @@ class GhidraCfgExtractor(ICfgExtractor):
             self.data[binary] = GhidraBinaryData()
 
         if self.data[binary].cfg_raw is None:
-            cmd = self._get_cmd_cfg(binary)
-            subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
+            binary_md5    = get_md5_file(binary)
+            cfg_json_name = "ghidra_cfg_" + binary_md5  + ".json"
+            cfg_json_path = os.path.join(self.get_tmp_folder(), cfg_json_name)
+            if not os.path.exists(cfg_json_path):
+                cmd = self._get_cmd_cfg(binary, cfg_json_path)
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
 
-            with open("/dev/shm/cfg.json", "r") as fin:
+            with open(cfg_json_path, "r") as fin:
                 cfg_raw = json.load(fin)
 
             self.data[binary].cfg_raw = cfg_raw

@@ -1,13 +1,12 @@
 import sys
 import os
 import rzpipe
-import hashlib
 import subprocess
 import networkx as nx
 
 from cfg_extractors import (
     CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor)
-from cfg_extractors.elf_utils import check_pie
+from cfg_extractors.utils import check_pie, get_md5_file
 
 
 class RZCfgExtractor(ICfgExtractor):
@@ -29,8 +28,7 @@ class RZCfgExtractor(ICfgExtractor):
         return self.faddr_cache[name]
 
     def _open_rz(self, binary):
-        with open(binary,'rb') as f_binary:
-            binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
+        binary_md5 = get_md5_file(binary)
         proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
 
         if not RZCfgExtractor.USE_PROJECTS or not os.path.exists(proj_name):
@@ -44,8 +42,6 @@ class RZCfgExtractor(ICfgExtractor):
             rz.cmd("aaaa")  # run also emulation stage
 
             if RZCfgExtractor.USE_PROJECTS:
-                with open(binary,'rb') as f_binary:
-                    binary_md5 = hashlib.md5(f_binary.read()).hexdigest()
                 proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
                 rz.cmd("Ps %s" % proj_name)
         else:
@@ -61,6 +57,7 @@ class RZCfgExtractor(ICfgExtractor):
             return False
 
     def get_callgraph(self, binary, entry=None):
+        # FIXME: build the callgraph using the single CFGs
         self.faddr_cache = dict()
 
         rz = self._open_rz(binary)
@@ -113,7 +110,10 @@ class RZCfgExtractor(ICfgExtractor):
                         if ref_raw["type"] == "CALL":
                             call_ref = ref_raw["addr"]
                             ops_with_call.append((i, call_ref))
-                insns.append(CFGInstruction(addr=op["offset"], call_ref=call_ref, mnemonic=op["disasm"]))
+                disasm = "???"
+                if "disasm" in op:
+                    disasm = op["disasm"]
+                insns.append(CFGInstruction(addr=op["offset"], call_ref=call_ref, mnemonic=disasm))
 
             if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
                 prev_op = 0
