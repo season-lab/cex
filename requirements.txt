@@ -2,3 +2,4 @@ networkx
 yapsy
 angr
 rzpipe
+pyplot

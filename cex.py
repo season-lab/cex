@@ -1,4 +1,5 @@
 import networkx as nx
+import sys
 
 from cex_plugin_manager import CexPluginManager
 
@@ -35,7 +36,13 @@ class CEX(object):
             cfg = self.get_cfg(binary, fun_addr, plugins)
             assert cfg is not None # this should not happen, since the functions are taken from the CG
 
-            node_callee = list(filter(lambda n_addr: callee in cfg.nodes[n_addr]["data"].calls, cfg.nodes))[0]
+            nodes_callee = list(filter(lambda n_addr: callee in cfg.nodes[n_addr]["data"].calls, cfg.nodes))
+            if len(nodes_callee) == 0:
+                # FIXME: this should not happen...
+                sys.stderr.write("WARNING: edge in CG between %#x and %#x, but %#x is not in the CFG of %#x\n" % \
+                    (fun_addr, callee, callee, fun_addr))
+                return list()
+            node_callee  = nodes_callee[0]
             return list(map(lambda n_addr: cfg.nodes[n_addr]["data"], nx.shortest_path(cfg, fun_addr, node_callee)))
 
         path = list()

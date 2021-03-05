@@ -9,10 +9,10 @@ class FunctionNotFoundException(Exception):
 
 
 class CFGInstruction(object):
-    def __init__(self, addr: int, call_ref: int, mnemonic: str):
-        self.addr     = addr
-        self.mnemonic = mnemonic
-        self.call_ref = call_ref
+    def __init__(self, addr: int, call_refs: list, mnemonic: str):
+        self.addr      = addr
+        self.mnemonic  = mnemonic
+        self.call_refs = call_refs
 
     def __str__(self):
         return "%#x : %s" % (self.addr, self.mnemonic)
@@ -119,7 +119,7 @@ class ICfgExtractor(IPlugin):
 
                 assert predecessors[0] == n_id
                 if not merge_calls and isinstance(node_data, CFGNodeData) and \
-                        node_data.insns[-1].call_ref is not None:
+                        node_data.insns[-1].call_refs is not None:
                     break
 
                 unique_successor_data = graph.nodes[unique_successor_id]["data"]
