@@ -38,11 +38,17 @@ class CEX(object):
 
             nodes_callee = list(filter(lambda n_addr: callee in cfg.nodes[n_addr]["data"].calls, cfg.nodes))
             if len(nodes_callee) == 0:
-                # FIXME: this should not happen...
-                sys.stderr.write("WARNING: edge in CG between %#x and %#x, but %#x is not in the CFG of %#x\n" % \
+                # This should not happen...
+                sys.stderr.write("ERROR: edge in CG between %#x and %#x, but %#x is not in the CFG of %#x\n" % \
                     (fun_addr, callee, callee, fun_addr))
                 return list()
+
             node_callee  = nodes_callee[0]
+            if not nx.has_path(cfg, fun_addr, node_callee):
+                sys.stderr.write("WARNING: no path between %#x and %#x in the CFG of %#x (non-connected graph?)\n" % \
+                    (fun_addr, node_callee, fun_addr))
+                return list()
+
             return list(map(lambda n_addr: cfg.nodes[n_addr]["data"], nx.shortest_path(cfg, fun_addr, node_callee)))
 
         path = list()

@@ -11,7 +11,8 @@ from cfg_extractors.utils import check_pie, get_md5_file
 
 class RizinBinaryData(object):
     def __init__(self):
-        self.cfg = dict()
+        self.cfg = dict()  # addr -> cfg
+        self.cg  = None
 
 
 class RZCfgExtractor(ICfgExtractor):
@@ -63,38 +64,40 @@ class RZCfgExtractor(ICfgExtractor):
             return False
 
     def get_callgraph(self, binary, entry=None):
-        # FIXME: build the callgraph using the single CFGs
         self.faddr_cache = dict()
 
-        rz = self._open_rz(binary)
-        cg = rz.cmdj("agCj")
-        g  = nx.DiGraph()
+        if binary not in self.cache:
+            self.cache[binary] = RizinBinaryData()
 
-        fname_dict = dict()
-        for fun in cg:
-            name = fun["name"]
-            off  = self._function_address(rz, name)
-            if off is None:
-                continue
+        if self.cache[binary].cg is None:
+            rz        = self._open_rz(binary)
+            functions = rz.cmdj("aflj")
+            cg        = nx.DiGraph()
 
-            if off not in g.nodes:
-                g.add_node(off, data=CGNodeData(addr=off, name=name))
+            for fun in functions:
+                addr = fun["offset"]
+                name = fun["name"]
+                cg.add_node(addr, data=CGNodeData(addr=addr, name=name))
 
-            for called_name in fun["imports"]:
-                called_off = self._function_address(rz, called_name)
-                if called_off is None:
+            for src_raw in functions:
+                src = src_raw["offset"]
+                if "callrefs" not in src_raw:
                     continue
-                if called_off not in g.nodes:
-                    g.add_node(called_off, data=CGNodeData(addr=called_off, name=called_name))
+                for dst_raw in src_raw["callrefs"]:
+                    if dst_raw["type"] != "CALL":
+                        continue
+                    dst = dst_raw["addr"]
+                    cg.add_edge(src, dst)
 
-                g.add_edge(off, called_off)
+            self.cache[binary].cg = cg
+            rz.quit()
 
-        rz.quit()
-        if entry is None or nx.number_of_nodes(g) == 0:
-            return g
-        if entry not in g.nodes:
+        cg = self.cache[binary].cg
+        if entry is None or nx.number_of_nodes(cg) == 0:
+            return cg
+        if entry not in cg.nodes:
             return nx.null_graph()
-        return nx.ego_graph(g, entry, radius=sys.maxsize)
+        return nx.ego_graph(cg, entry, radius=sys.maxsize)
 
     def get_cfg(self, binary, addr):
         self.faddr_cache = dict()
@@ -102,70 +105,72 @@ class RZCfgExtractor(ICfgExtractor):
         if binary not in self.cache:
             self.cache[binary] = RizinBinaryData()
 
-        if addr not in self.cache[binary].cfg:
-            rz  = self._open_rz(binary)
-            cfg = rz.cmdj("agj @ %#x" % addr)[0]
-            g   = nx.DiGraph()
+        if addr in self.cache[binary].cfg:
+            return self.cache[binary].cfg[addr]
 
-            edges = list()
-            for block in cfg["blocks"]:
-                addr = block["offset"]
+        rz  = self._open_rz(binary)
+        cfg = rz.cmdj("agj @ %#x" % addr)[0]
+        g   = nx.DiGraph()
 
-                insns         = list()
-                ops_with_call = list()
-                for i, op in enumerate(block["ops"]):
-                    call_refs = None
-                    if "refs" in op:
-                        call_refs = list()
-                        for ref_raw in op["refs"]:
-                            if ref_raw["type"] == "CALL":
-                                call_refs.append(ref_raw["addr"])
-                        ops_with_call.append((i, call_refs if len(call_refs) > 0 else None))
-                    disasm = "???"
-                    if "disasm" in op:
-                        disasm = op["disasm"]
-                    insns.append(CFGInstruction(addr=op["offset"], call_refs=call_refs, mnemonic=disasm))
+        edges = list()
+        for block in cfg["blocks"]:
+            addr = block["offset"]
 
-                if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
-                    prev_op = 0
-                    for op_idx, call_target in ops_with_call:
-                        op_addr     = addr
-                        next_op     = op_idx + 1
-                        insns_slice = insns[prev_op:next_op]
-                        calls       = [call_target]
+            insns         = list()
+            ops_with_call = list()
+            for i, op in enumerate(block["ops"]):
+                call_refs = list()
+                if "refs" in op:
+                    for ref_raw in op["refs"]:
+                        if ref_raw["type"] == "CALL":
+                            call_refs.append(ref_raw["addr"])
+                    if len(call_refs) > 0:
+                        ops_with_call.append((i, call_refs))
+                disasm = "???"
+                if "disasm" in op:
+                    disasm = op["disasm"]
+                insns.append(CFGInstruction(addr=op["offset"], call_refs=call_refs, mnemonic=disasm))
 
-                        g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=calls))
-                        if next_op < len(block["ops"]):
-                            addr = block["ops"][next_op]["offset"]
-                            edges.append((op_addr, addr))
-                        prev_op = next_op
+            if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
+                prev_op = 0
+                for op_idx, call_targets in ops_with_call:
+                    op_addr     = addr
+                    next_op     = op_idx + 1
+                    insns_slice = insns[prev_op:next_op]
+                    calls       = call_targets
 
-                    if next_op < len(insns):
-                        op_addr     = addr
-                        insns_slice = insns[next_op:]
-                        g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=[]))
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=calls))
+                    if next_op < len(block["ops"]):
+                        addr = block["ops"][next_op]["offset"]
+                        edges.append((op_addr, addr))
+                    prev_op = next_op
 
-                else:
-                    calls = list(map(lambda x: x[1], ops_with_call))
-                    g.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
+                if next_op < len(insns):
+                    op_addr     = addr
+                    insns_slice = insns[next_op:]
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=list()))
 
-                if "jump" in block:
-                    dst = block["jump"]
-                    edges.append((addr, dst))
-                if "fail" in block:
-                    dst = block["fail"]
-                    edges.append((addr, dst))
+            else:
+                calls = list(map(lambda x: x[1], ops_with_call))
+                g.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
 
-            for src, dst in edges:
-                if src not in g.nodes:
-                    sys.stderr.write("WARNING: %#x not in nodes\n" % src)
-                    continue
-                if dst not in g.nodes:
-                    sys.stderr.write("WARNING: %#x not in nodes\n" % dst)
-                    continue
-                g.add_edge(src, dst)
+            if "jump" in block:
+                dst = block["jump"]
+                edges.append((addr, dst))
+            if "fail" in block:
+                dst = block["fail"]
+                edges.append((addr, dst))
 
-            self.cache[binary].cfg[addr] = g
-            rz.quit()
+        for src, dst in edges:
+            if src not in g.nodes:
+                sys.stderr.write("WARNING: %#x not in nodes\n" % src)
+                continue
+            if dst not in g.nodes:
+                sys.stderr.write("WARNING: %#x not in nodes\n" % dst)
+                continue
+            g.add_edge(src, dst)
 
-        return self.normalize_graph(self.cache[binary].cfg[addr])
+        self.cache[binary].cfg[addr] = self.normalize_graph(g)
+        rz.quit()
+
+        return self.cache[binary].cfg[addr]

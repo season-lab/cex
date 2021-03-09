@@ -8,7 +8,7 @@ from cfg_extractors.utils import check_pie
 from cex import CEX
 
 def usage():
-    sys.stderr.write("USAGE: %s <cmd> [<arg> ...]\n" % sys.argv[0])
+    sys.stderr.write("USAGE: %s <plugin> <cmd> [<arg> ...]\n" % sys.argv[0])
     exit(1)
 
 def check_pincher():
@@ -59,26 +59,30 @@ def find_paths_of_lenght(G, k):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         usage()
 
     if not check_pincher():
         sys.stderr.write("pincher not found\n")
         exit(1)
 
-    prog_cmd  = sys.argv[1:]
+    plugin    = sys.argv[1]
+    prog_cmd  = sys.argv[2:]
     prog_path = prog_cmd[0]
+
+    cex = CEX()
+    if plugin not in cex.pm.get_plugin_names():
+        sys.stderr.write("%s is not a valid plugin name [valid names: %s]\n" % (plugin, " ".join(cex.pm.get_plugin_names())))
+        exit(1)
 
     dyn_callgraph = gen_dyn_callgraph(prog_cmd)
     paths = find_paths_of_lenght(dyn_callgraph, 1)
     if check_pie(prog_path):
         paths = list(map(lambda p: list(map(lambda x: x + 0x400000, p)), paths))
 
-    cex = CEX()
-
     found = 0
     for path in paths:
-        p = cex.find_path(prog_path, path[0], path[-1], plugins=["Ghidra"])
+        p = cex.find_path(prog_path, path[0], path[-1], plugins=[plugin])
         if len(p) > 0:
             found += 1
         else:
