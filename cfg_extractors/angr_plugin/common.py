@@ -1,3 +1,4 @@
+import sys
 import angr
 import networkx as nx
 
@@ -5,7 +6,7 @@ from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtracto
 from cfg_extractors.angr_plugin.graph_utils import to_supergraph
 
 
-class BinaryData(object):
+class AngrBinaryData(object):
     def __init__(self, proj, angr_cfg, angr_cg, cg, cfg):
         self.proj     = proj
         self.angr_cfg = angr_cfg
@@ -22,7 +23,7 @@ class AngrCfgExtractor(ICfgExtractor):
 
     def _build_project(self, binary: str):
         if binary not in self.data:
-            self.data[binary] = BinaryData(
+            self.data[binary] = AngrBinaryData(
                 proj=angr.Project(binary, auto_load_libs=False),
                 angr_cfg=None,
                 angr_cg=None,
@@ -46,6 +47,9 @@ class AngrCfgExtractor(ICfgExtractor):
         if entry not in self.data[binary].cg:
             g = nx.DiGraph()
             for src, dst in nx.dfs_edges(self.data[binary].angr_cg, source=entry):
+                if src not in self.data[binary].angr_cfg.functions or dst not in self.data[binary].angr_cfg.functions:
+                    sys.stderr.write("ERROR: %#x or %#x is in callgraph, but there is no CFG\n" % (src, dst))
+                    continue
                 if src not in g.nodes:
                     g.add_node(src, data=CGNodeData(addr=src, name=self.data[binary].angr_cfg.functions[src].name))
                 if dst not in g.nodes:
@@ -79,7 +83,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 insns = list()
                 for insn in fun.get_block(node.addr, node.size).capstone.insns:
                     mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
-                    insns.append(CFGInstruction(addr=insn.insn.address, call_refs=None, mnemonic=mnemonic))
+                    insns.append(CFGInstruction(addr=insn.insn.address, call_refs=list(), mnemonic=mnemonic))
 
                 if len(calls) > 0:
                     insns[-1].call_refs = calls

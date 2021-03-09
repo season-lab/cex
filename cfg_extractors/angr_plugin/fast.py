@@ -4,7 +4,7 @@ class AngrCfgExtractorFast(AngrCfgExtractor):
     def _get_angr_cfg(self, proj):
         temp_cfb = proj.analyses.CFB(exclude_region_types={'kernel', 'tls'})
         return proj.analyses.CFG(
-            normalize=True,
+            normalize=False,
             use_patches=True,
             cfb=temp_cfb,
             # data_references=True,

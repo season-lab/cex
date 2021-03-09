@@ -119,7 +119,7 @@ class ICfgExtractor(IPlugin):
 
                 assert predecessors[0] == n_id
                 if not merge_calls and isinstance(node_data, CFGNodeData) and \
-                        node_data.insns[-1].call_refs is not None:
+                        len(node_data.insns[-1].call_refs) > 0:
                     break
 
                 unique_successor_data = graph.nodes[unique_successor_id]["data"]
