@@ -43,21 +43,6 @@ class GhidraCfgExtractor(ICfgExtractor):
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
 
-    @staticmethod
-    def _get_cmd_callgraph(binary):
-        ghidra_home = os.environ["GHIDRA_HOME"]
-        cmd = GhidraCfgExtractor.CMD_CALLGRAPH[:]
-
-        for i in range(len(cmd)):
-            cmd[i] = cmd[i]                           \
-                .replace("$GHIDRA_HOME", ghidra_home) \
-                .replace("$BINARY", binary)           \
-                .replace("$OUTFILE", "/dev/shm/cg.json")
-
-        if check_pie(binary):
-            cmd += GhidraCfgExtractor.CMD_PIE_ELF
-        return cmd
-
     def _get_cmd_cfg(self, binary, outfile):
         ghidra_home = os.environ["GHIDRA_HOME"]
         cmd = GhidraCfgExtractor.CMD_CFG[:]
