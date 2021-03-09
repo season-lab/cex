@@ -47,6 +47,14 @@ class CFGNodeData(object):
             return self
         return other
 
+    def explode(self):
+        " Split the node in len(insns) nodes "
+
+        res = list()
+        for insn in self.insns:
+            res.append(CFGNodeData(insn.addr, [insn], insn.call_refs))
+        return res
+
     def __str__(self):
         return "<CFGNode %#x>" % self.addr
 
@@ -58,15 +66,6 @@ class CGNodeData(object):
 
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
-
-    def join(self, other):
-        # Does it makes sense in some circumstances?
-        raise NotImplementedError
-
-    def merge(self, other):
-        assert isinstance(other, CGNodeData)
-        assert self.addr == other.addr
-        return self
 
     def __str__(self):
         return "<CGNode %s @ %#x>" % (self.name, self.addr)

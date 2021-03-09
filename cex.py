@@ -2,6 +2,7 @@ import networkx as nx
 import sys
 
 from cex_plugin_manager import CexPluginManager
+from cfg_extractors import ICfgExtractor
 
 
 class CEX(object):
@@ -22,7 +23,7 @@ class CEX(object):
         plugins = list(map(lambda p: self.pm.get_plugin_by_name(p), plugins))
 
         graphs = list(map(lambda p: p.get_cfg(binary, addr), plugins))
-        return CEX.merge_graphs(*graphs)
+        return CEX.merge_cfgs(*graphs)
 
     def find_path(self, binary, src_addr, dst_addr, plugins=None, include_cfgs=True):
         callgraph = self.get_callgraph(binary, src_addr, plugins)
@@ -58,22 +59,52 @@ class CEX(object):
         return path
 
     @staticmethod
+    def explode_cfg(g):
+        res_g = nx.DiGraph()
+
+        exploded_nodes = dict()
+        for n_id in g.nodes:
+            node_data = g.nodes[n_id]["data"]
+            nodes = node_data.explode()
+
+            for n in nodes:
+                res_g.add_node(n.addr, data=n)
+
+            for src, dst in zip(nodes, nodes[1:]):
+                res_g.add_edge(src.addr, dst.addr)
+
+            if len(nodes) > 1:
+                exploded_nodes[n_id] = nodes[-1].addr
+
+        for src_id, dst_id in g.edges:
+            if src_id in exploded_nodes:
+                src_id = exploded_nodes[src_id]
+            res_g.add_edge(src_id, dst_id)
+        return res_g
+
+    @staticmethod
+    def merge_cfgs(*graphs):
+        if len(graphs) == 1:
+            return graphs[0]
+
+        exploded_graphs = list(map(CEX.explode_cfg, graphs))
+        merged          = CEX.merge_graphs(*exploded_graphs)
+        return ICfgExtractor.normalize_graph(merged)
+
+    @staticmethod
     def merge_graphs(*graphs):
         if len(graphs) == 1:
             return graphs[0]
 
-        res_graph    = nx.DiGraph()
-        merged_nodes = dict()
+        visited   = set()
+        res_graph = nx.DiGraph()
         for g in graphs:
             for n_id in g.nodes:
-                node = g.nodes[n_id]["data"]
-                if n_id in merged_nodes:
-                    merged_nodes[n_id] = merged_nodes[n_id].merge(node)
-                else:
-                    merged_nodes[n_id] = node
+                if n_id in visited:
+                    continue
+                visited.add(n_id)
+                res_graph.add_node(n_id, data=g.nodes[n_id]["data"])
 
-        for n_id in merged_nodes:
-            res_graph.add_node(n_id, data=merged_nodes[n_id])
         for g in graphs:
             for src_id, dst_id in g.edges:
                 res_graph.add_edge(src_id, dst_id)
