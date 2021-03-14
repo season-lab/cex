@@ -21,7 +21,9 @@ def dump_dot_cg(addr, graph, outdir=None):
         print(dot)
         return
 
-    with open(os.path.join(outdir, "cg-%s.dot" % addr)) as fout:
+    if addr is None:
+        addr = "complete"
+    with open(os.path.join(outdir, "cg-%s.dot" % addr), "w") as fout:
         fout.write(dot)
 
 def dump_json_cg(addr, graph, outdir=None):
@@ -30,7 +32,9 @@ def dump_json_cg(addr, graph, outdir=None):
         print(g_json)
         return
 
-    with open(os.path.join(outdir, "cg-%s.json" % addr)) as fout:
+    if addr is None:
+        addr = "complete"
+    with open(os.path.join(outdir, "cg-%s.json" % addr), "w") as fout:
         fout.write(g_json)
 
 def dump_dot_cfg(addr, graph, outdir=None):
@@ -39,7 +43,7 @@ def dump_dot_cfg(addr, graph, outdir=None):
         print(dot)
         return
 
-    with open(os.path.join(outdir, "cfg-%s.dot" % addr)) as fout:
+    with open(os.path.join(outdir, "cfg-%s.dot" % addr), "w") as fout:
         fout.write(dot)
 
 def dump_json_cfg(addr, graph, outdir=None):
@@ -48,7 +52,7 @@ def dump_json_cfg(addr, graph, outdir=None):
         print(g_json)
         return
 
-    with open(os.path.join(outdir, "cfg-%s.json" % addr)) as fout:
+    with open(os.path.join(outdir, "cfg-%s.json" % addr), "w") as fout:
         fout.write(g_json)
 
 def dump_dot_path(graph, outdir=None):
@@ -57,7 +61,7 @@ def dump_dot_path(graph, outdir=None):
         print(dot)
         return
 
-    with open(os.path.join(outdir, "path-%s.dot" % addr)) as fout:
+    with open(os.path.join(outdir, "path-%s.dot" % addr), "w") as fout:
         fout.write(dot)
 
 def to_num(addr):
@@ -92,7 +96,7 @@ def main(args):
         else:
             cg_addr = to_num(cg_addr)
         graph = cex.get_callgraph(binary, cg_addr, plugins)
-        dump_dot_cg(str(cg_addr), graph, args.output)
+        dump_dot_cg(cg_addr, graph, args.output)
 
     for cg_addr in cgs_json:
         if cg_addr == "-":
@@ -100,7 +104,7 @@ def main(args):
         else:
             cg_addr = to_num(cg_addr)
         graph = cex.get_callgraph(binary, cg_addr, plugins)
-        dump_json_cg(str(cg_addr), graph, args.output)
+        dump_json_cg(cg_addr, graph, args.output)
 
     for cfg_addr in cfgs_dot:
         graph = cex.get_cfg(binary, to_num(cfg_addr), plugins)
