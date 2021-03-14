@@ -14,6 +14,12 @@ class CFGInstruction(object):
         self.mnemonic  = mnemonic
         self.call_refs = call_refs
 
+    def to_json(self):
+        return '{{"addr": {addr}, "mnemonic": "{mnemonic}", "call_refs": {call_refs}}}'.format(
+            addr=self.addr,
+            mnemonic=self.mnemonic,
+            call_refs='[%s]' % ", ".join(map(str, self.call_refs)))
+
     def __str__(self):
         return "%#x : %s" % (self.addr, self.mnemonic)
 
@@ -26,6 +32,15 @@ class CFGNodeData(object):
 
     def get_dot_label(self):
         return "\l".join(map(str, self.insns)) + "\l"
+
+    def get_json(self, successors: list):
+        res = '{{"addr": {addr}, "instructions": {insns}, "successors": {successors}}}'
+        insns = map(lambda x: x.to_json(), self.insns)
+        successors = map(str, successors)
+        return res.format(
+            addr=self.addr,
+            insns="[%s]" % ", ".join(insns),
+            successors="[%s]" % ", ".join(successors))
 
     def join(self, other):
         " Append other instructions to self "
@@ -66,6 +81,12 @@ class CGNodeData(object):
 
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
+
+    def get_json(self, successors: list):
+        return '{{"addr": {addr}, "name": "{name}", "successors": {successors}}}'.format(
+            addr=self.addr,
+            name=self.name,
+            successors="[%s]" % ", ".join(map(str, successors)))
 
     def __str__(self):
         return "<CGNode %s @ %#x>" % (self.name, self.addr)

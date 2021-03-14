@@ -81,12 +81,17 @@ class RZCfgExtractor(ICfgExtractor):
 
             for src_raw in functions:
                 src = src_raw["offset"]
+                assert src in cg.nodes
+
                 if "callrefs" not in src_raw:
                     continue
                 for dst_raw in src_raw["callrefs"]:
                     if dst_raw["type"] != "CALL":
                         continue
                     dst = dst_raw["addr"]
+                    if dst not in cg.nodes:
+                        sys.stderr.write("WARNING: %#x not in nodes (dst)\n" % dst)
+                        continue
                     cg.add_edge(src, dst)
 
             self.cache[binary].cg = cg

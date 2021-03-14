@@ -132,5 +132,9 @@ class CEX(object):
         return header + body + footer
 
     @staticmethod
-    def to_json(graph, filename):
-        pass
+    def to_json(graph):
+        res = "[%s]" % ", ".join(
+            map(
+                lambda n_id: graph.nodes[n_id]["data"].get_json(list(map(lambda x: x[1], graph.out_edges(n_id)))),
+                graph.nodes))
+        return res

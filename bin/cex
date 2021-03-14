@@ -24,7 +24,16 @@ def dump_dot_cg(addr, graph, outdir=None):
     with open(os.path.join(outdir, "cg-%s.dot" % addr)) as fout:
         fout.write(dot)
 
-def dump_dot_cfg(graph, outdir=None):
+def dump_json_cg(addr, graph, outdir=None):
+    g_json = CEX.to_json(graph)
+    if outdir is None:
+        print(g_json)
+        return
+
+    with open(os.path.join(outdir, "cg-%s.json" % addr)) as fout:
+        fout.write(g_json)
+
+def dump_dot_cfg(addr, graph, outdir=None):
     dot = CEX.to_dot(graph)
     if outdir is None:
         print(dot)
@@ -32,6 +41,15 @@ def dump_dot_cfg(graph, outdir=None):
 
     with open(os.path.join(outdir, "cfg-%s.dot" % addr)) as fout:
         fout.write(dot)
+
+def dump_json_cfg(addr, graph, outdir=None):
+    g_json = CEX.to_json(graph)
+    if outdir is None:
+        print(g_json)
+        return
+
+    with open(os.path.join(outdir, "cfg-%s.json" % addr)) as fout:
+        fout.write(g_json)
 
 def dump_dot_path(graph, outdir=None):
     dot = CEX.to_dot(graph)
@@ -63,10 +81,12 @@ def main(args):
     if args.use_plugins is not None:
         plugins = args.use_plugins
 
-    binary = args.binary
-    cgs    = args.dump_dot_cg or []
-    cfgs   = args.dump_dot_cfg or []
-    for cg_addr in cgs:
+    binary    = args.binary
+    cgs_dot   = args.dump_dot_cg or []
+    cfgs_dot  = args.dump_dot_cfg or []
+    cgs_json  = args.dump_json_cg or []
+    cfgs_json = args.dump_json_cfg or []
+    for cg_addr in cgs_dot:
         if cg_addr == "-":
             cg_addr = None
         else:
@@ -74,9 +94,21 @@ def main(args):
         graph = cex.get_callgraph(binary, cg_addr, plugins)
         dump_dot_cg(str(cg_addr), graph, args.output)
 
-    for cfg_addr in cfgs:
+    for cg_addr in cgs_json:
+        if cg_addr == "-":
+            cg_addr = None
+        else:
+            cg_addr = to_num(cg_addr)
+        graph = cex.get_callgraph(binary, cg_addr, plugins)
+        dump_json_cg(str(cg_addr), graph, args.output)
+
+    for cfg_addr in cfgs_dot:
         graph = cex.get_cfg(binary, to_num(cfg_addr), plugins)
-        dump_dot_cg(cfg_addr, graph, args.output)
+        dump_dot_cfg(cfg_addr, graph, args.output)
+
+    for cfg_addr in cfgs_json:
+        graph = cex.get_cfg(binary, to_num(cfg_addr), plugins)
+        dump_json_cfg(cfg_addr, graph, args.output)
 
     if args.find_path is not None:
         src, dst = args.find_path
@@ -102,8 +134,10 @@ if __name__=="__main__":
     parser.add_argument("--list-plugins", help="Print the installed plugins", action="version", version=get_plugins())
     parser.add_argument("--use-plugins", metavar="PLUGIN", help="Comma separated list of plugins to use. If omitted, use %s." % CEX.default_plugin, nargs="*")
     parser.add_argument("--output", metavar="DIRECTORY", help="Output directory. If omitted, stdout")
-    parser.add_argument("--dump-dot-cg", metavar="ADDR", help="Dump the callgraph from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
-    parser.add_argument("--dump-dot-cfg", metavar="ADDR", help="Dump the control flow graph of the function at address ADDR", nargs="*")
+    parser.add_argument("--dump-dot-cg", metavar="ADDR", help="Dump the callgraph in dot from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
+    parser.add_argument("--dump-json-cg", metavar="ADDR", help="Dump the callgraph in json from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
+    parser.add_argument("--dump-dot-cfg", metavar="ADDR", help="Dump the control flow graph of the function in dot at address ADDR", nargs="*")
+    parser.add_argument("--dump-json-cfg", metavar="ADDR", help="Dump the control flow graph of the function in json at address ADDR", nargs="*")
     parser.add_argument("--find-path", metavar="ADDR1,ADDR2", type=pair_type, help="Find a path between the two functions at ADDR1 and ADDR2", nargs="?")
     parser.add_argument("--dump-dot-path", help="Dump the path found by --find-path in dot format", default=False, action="store_true")
     parser.add_argument("binary", help="The binary to analyze")
