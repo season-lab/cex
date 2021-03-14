@@ -136,7 +136,7 @@ def main(args):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Cfg EXtractor')
     parser.add_argument("--list-plugins", help="Print the installed plugins", action="version", version=get_plugins())
-    parser.add_argument("--use-plugins", metavar="PLUGIN", help="Comma separated list of plugins to use. If omitted, use %s." % CEX.default_plugin, nargs="*")
+    parser.add_argument("--use-plugins", metavar="PLUGIN", help="List of plugins to use. If omitted, use %s." % CEX.default_plugin, nargs="*")
     parser.add_argument("--output", metavar="DIRECTORY", help="Output directory. If omitted, stdout")
     parser.add_argument("--dump-dot-cg", metavar="ADDR", help="Dump the callgraph in dot from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
     parser.add_argument("--dump-json-cg", metavar="ADDR", help="Dump the callgraph in json from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
