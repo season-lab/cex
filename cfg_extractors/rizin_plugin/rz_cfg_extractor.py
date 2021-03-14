@@ -34,6 +34,13 @@ class RZCfgExtractor(ICfgExtractor):
             self.faddr_cache[name] = addr
         return self.faddr_cache[name]
 
+    @staticmethod
+    def _get_symbol_name(rz, address):
+        symb_name = rz.cmd("f~%x[2]" % address).strip()
+        if symb_name == "":
+            return None
+        return symb_name
+
     def _open_rz(self, binary):
         binary_md5 = get_md5_file(binary)
         proj_name = os.path.join(self.get_tmp_folder(), "rizin_proj_%s.rzdb" % binary_md5)
@@ -90,8 +97,12 @@ class RZCfgExtractor(ICfgExtractor):
                         continue
                     dst = dst_raw["addr"]
                     if dst not in cg.nodes:
-                        sys.stderr.write("WARNING: %#x not in nodes (dst)\n" % dst)
-                        continue
+                        symb_name = RZCfgExtractor._get_symbol_name(rz, dst)
+                        if symb_name is None:
+                            sys.stderr.write("WARNING: %#x not in nodes (dst)\n" % dst)
+                            continue
+                        # External function. Add to CG
+                        cg.add_node(dst, data=CGNodeData(addr=dst, name=symb_name))
                     cg.add_edge(src, dst)
 
             self.cache[binary].cg = cg
