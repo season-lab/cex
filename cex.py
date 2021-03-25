@@ -1,8 +1,8 @@
 import networkx as nx
 import sys
 
-from .cex_plugin_manager import CexPluginManager
-from .cfg_extractors import ICfgExtractor
+from cex_plugin_manager import CexPluginManager
+from cfg_extractors import ICfgExtractor
 
 
 class CEX(object):
@@ -26,6 +26,7 @@ class CEX(object):
         return CEX.merge_cfgs(*graphs)
 
     def find_path(self, binary, src_addr, dst_addr, plugins=None, include_cfgs=True):
+        plugins = plugins or [self.default_plugin]
         callgraph = self.get_callgraph(binary, src_addr, plugins)
         if nx.number_of_nodes(callgraph) == 0 or dst_addr not in callgraph:
             return []
@@ -110,6 +111,10 @@ class CEX(object):
                 res_graph.add_edge(src_id, dst_id)
 
         return res_graph
+
+    @staticmethod
+    def rebase_addr(addr):
+        return addr + 0x400000
 
     @staticmethod
     def to_dot(graph):
