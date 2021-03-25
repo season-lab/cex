@@ -77,7 +77,7 @@ class GhidraCfgExtractor(ICfgExtractor):
             cfg_json_path = os.path.join(self.get_tmp_folder(), cfg_json_name)
             if not os.path.exists(cfg_json_path):
                 cmd = self._get_cmd_cfg(binary, cfg_json_path)
-                subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             with open(cfg_json_path, "r") as fin:
                 cfg_raw = json.load(fin)
