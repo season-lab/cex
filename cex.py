@@ -1,8 +1,8 @@
 import networkx as nx
 import sys
 
-from cex_plugin_manager import CexPluginManager
-from cfg_extractors import ICfgExtractor
+from .cex_plugin_manager import CexPluginManager
+from .cfg_extractors import ICfgExtractor
 
 
 class CEX(object):
