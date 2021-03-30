@@ -112,7 +112,7 @@ public class ExportCFG extends HeadlessScript {
                         first_iter_insts = false;
 
                     CodeBlock succ = succ_ref.getDestinationBlock();
-                    if (!visited.contains(succ))
+                    if (!visited.contains(succ) && succ != null)
                         stack.push(succ);
                     pout.format("        \"%#x\"", succ.getFirstStartAddress().getOffset());
                 }
