@@ -4,6 +4,7 @@ import networkx as nx
 
 from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, FunctionNotFoundException
 from cfg_extractors.angr_plugin.graph_utils import to_supergraph
+from cfg_extractors.utils import check_pie
 
 
 class AngrBinaryData(object):
@@ -23,8 +24,11 @@ class AngrCfgExtractor(ICfgExtractor):
 
     def _build_project(self, binary: str):
         if binary not in self.data:
+            load_options={'main_opts': {}}
+            if check_pie(binary):
+                load_options['custom_base_addr'] = 0x400000
             self.data[binary] = AngrBinaryData(
-                proj=angr.Project(binary, auto_load_libs=False),
+                proj=angr.Project(binary, auto_load_libs=False, load_options=load_options),
                 angr_cfg=None,
                 angr_cg=None,
                 cg=dict(),
