@@ -17,11 +17,18 @@ class GhidraBinaryData(object):
 
 class GhidraCfgExtractor(ICfgExtractor):
 
+    CMD_ANALYSIS_ONLY = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-import",
+        "$BINARY" ]
+
     CMD_CFG = [
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "$GHIDRA_OP",  # either -process (if the project exists) or import
+        "$GHIDRA_OP",  # either -process (if the project exists) or -import
         "$BINARY",
         "-postScript",
         "ExportCFG.java",
@@ -42,6 +49,25 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
+
+    def get_project_path(self, binary):
+        binary_md5 = get_md5_file(binary)
+        proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
+        proj_path  = os.path.join(self.get_tmp_folder(), proj_name)
+        if not os.path.exists(proj_path):
+            ghidra_home = os.environ["GHIDRA_HOME"]
+            cmd = GhidraCfgExtractor.CMD_ANALYSIS_ONLY[:]
+            for i in range(len(cmd)):
+                cmd[i] = cmd[i]                                     \
+                    .replace("$GHIDRA_HOME", ghidra_home)           \
+                    .replace("$BINARY", binary)                     \
+                    .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
+                    .replace("$PROJ_NAME", proj_name)
+            if check_pie(binary):
+                cmd += GhidraCfgExtractor.CMD_PIE_ELF
+
+            subprocess.check_call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        return proj_path
 
     def _get_cmd_cfg(self, binary, outfile):
         ghidra_home = os.environ["GHIDRA_HOME"]
