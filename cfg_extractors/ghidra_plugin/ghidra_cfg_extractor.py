@@ -22,18 +22,32 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$PROJ_FOLDER",
         "$PROJ_NAME",
         "-import",
-        "$BINARY" ]
+        "$BINARY",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__)) ]
 
-    CMD_CFG = [
+    CMD_CFG_USE_EXISTING = [
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "$GHIDRA_OP",  # either -process (if the project exists) or -import
+        "-noanalysis",
+        "-process",
         "$BINARY",
         "-postScript",
         "ExportCFG.java",
         "$OUTFILE",
-        # "-deleteProject",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__))]
+
+    CMD_CFG_CREATE_NEW = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-import",
+        "$BINARY",
+        "-postScript",
+        "ExportCFG.java",
+        "$OUTFILE",
         "-scriptPath",
         os.path.realpath(os.path.dirname(__file__))]
 
@@ -71,14 +85,14 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     def _get_cmd_cfg(self, binary, outfile):
         ghidra_home = os.environ["GHIDRA_HOME"]
-        cmd = GhidraCfgExtractor.CMD_CFG[:]
 
         binary_md5 = get_md5_file(binary)
         proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
-        ghidra_op  = "-import"
         if os.path.exists(os.path.join(self.get_tmp_folder(), proj_name)):
-            ghidra_op = "-process"
+            cmd = GhidraCfgExtractor.CMD_CFG_USE_EXISTING[:]
             binary = os.path.basename(binary)
+        else:
+            cmd = GhidraCfgExtractor.CMD_CFG_CREATE_NEW[:]
 
         for i in range(len(cmd)):
             cmd[i] = cmd[i]                                     \
@@ -86,7 +100,6 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$BINARY", binary)                     \
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
-                .replace("$GHIDRA_OP", ghidra_op)               \
                 .replace("$OUTFILE", outfile)
 
         if check_pie(binary):
