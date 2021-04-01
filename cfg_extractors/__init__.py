@@ -108,7 +108,7 @@ class ICfgExtractor(IPlugin):
         raise NotImplementedError
 
     def get_tmp_folder(self):
-        return "/tmp/cex_projects"
+        return "/dev/shm/cex_projects"
 
     @staticmethod
     def normalize_graph(graph, merge_calls=False):
