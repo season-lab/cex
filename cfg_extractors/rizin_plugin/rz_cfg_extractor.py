@@ -190,3 +190,6 @@ class RZCfgExtractor(ICfgExtractor):
         rz.quit()
 
         return self.cache[binary].cfg[addr]
+
+    def clear_cache(self):
+        self.cache = dict()

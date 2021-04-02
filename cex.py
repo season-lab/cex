@@ -143,3 +143,8 @@ class CEX(object):
                 lambda n_id: graph.nodes[n_id]["data"].get_json(list(map(lambda x: x[1], graph.out_edges(n_id)))),
                 graph.nodes))
         return res
+
+    def clear_plugins_cache(self):
+        for pname in self.pm.get_plugin_names():
+            plugin = self.pm.get_plugin_by_name(pname)
+            plugin.clear_cache()

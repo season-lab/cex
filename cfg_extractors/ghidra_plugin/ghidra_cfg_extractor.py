@@ -184,3 +184,6 @@ class GhidraCfgExtractor(ICfgExtractor):
                 cfg.add_edge(src, dst)
 
         return self.normalize_graph(cfg)
+
+    def clear_cache(self):
+        self.data = dict()

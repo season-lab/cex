@@ -159,3 +159,6 @@ class ICfgExtractor(IPlugin):
             out_graph.add_edge(src_id, dst_id)
 
         return out_graph
+
+    def clear_cache(self):
+        return  # Look in subclasses
