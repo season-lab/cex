@@ -138,7 +138,8 @@ public class ExportCFG extends HeadlessScript {
             }
             pout.format("  ]\n");
         }
-        pout.format(" }\n");
+        if (!first_iter_functions)
+            pout.format(" }\n");
         pout.format("]\n");
 
         fout.close();
