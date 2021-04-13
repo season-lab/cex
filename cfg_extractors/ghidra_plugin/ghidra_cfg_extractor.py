@@ -9,10 +9,11 @@ from cfg_extractors.utils import check_pie, get_md5_file
 
 
 class GhidraBinaryData(object):
-    def __init__(self, cfg_raw=None, cg_raw=None, cg=None):
+    def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None):
         self.cfg_raw = cfg_raw
         self.cg_raw  = cg_raw
         self.cg      = cg
+        self.acc_cg  = acc_cg
 
 
 class GhidraCfgExtractor(ICfgExtractor):
@@ -39,6 +40,19 @@ class GhidraCfgExtractor(ICfgExtractor):
         "-scriptPath",
         os.path.realpath(os.path.dirname(__file__))]
 
+    CMD_CG_USE_EXISTING = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-noanalysis",
+        "-process",
+        "$BINARY",
+        "-postScript",
+        "ExportAccurateCallgraph.java",
+        "$OUTFILE",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__))]
+
     CMD_CFG_CREATE_NEW = [
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
@@ -47,6 +61,18 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$BINARY",
         "-postScript",
         "ExportCFG.java",
+        "$OUTFILE",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__))]
+
+    CMD_CG_CREATE_NEW = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-import",
+        "$BINARY",
+        "-postScript",
+        "ExportAccurateCallgraph.java",
         "$OUTFILE",
         "-scriptPath",
         os.path.realpath(os.path.dirname(__file__))]
@@ -60,6 +86,8 @@ class GhidraCfgExtractor(ICfgExtractor):
     def __init__(self):
         super().__init__()
         self.data = dict()
+
+        self.use_accurate = False
 
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
@@ -106,6 +134,29 @@ class GhidraCfgExtractor(ICfgExtractor):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
 
+    def _get_cmd_cg(self, binary, outfile):
+        ghidra_home = os.environ["GHIDRA_HOME"]
+
+        binary_md5 = get_md5_file(binary)
+        proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
+        if os.path.exists(os.path.join(self.get_tmp_folder(), proj_name)):
+            cmd = GhidraCfgExtractor.CMD_CG_USE_EXISTING[:]
+            binary = os.path.basename(binary)
+        else:
+            cmd = GhidraCfgExtractor.CMD_CG_CREATE_NEW[:]
+
+        for i in range(len(cmd)):
+            cmd[i] = cmd[i]                                     \
+                .replace("$GHIDRA_HOME", ghidra_home)           \
+                .replace("$BINARY", binary)                     \
+                .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
+                .replace("$PROJ_NAME", proj_name)               \
+                .replace("$OUTFILE", outfile)
+
+        if check_pie(binary):
+            cmd += GhidraCfgExtractor.CMD_PIE_ELF
+        return cmd
+
     def _load_cfg_raw(self, binary):
         if binary not in self.data:
             self.data[binary] = GhidraBinaryData()
@@ -123,7 +174,24 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             self.data[binary].cfg_raw = cfg_raw
 
-    def get_callgraph(self, binary, entry=None):
+    def _load_accurate_cg_raw(self, binary):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        if self.data[binary].cg_raw is None:
+            binary_md5    = get_md5_file(binary)
+            cg_json_name = "ghidra_cg_" + binary_md5  + ".json"
+            cg_json_path = os.path.join(self.get_tmp_folder(), cg_json_name)
+            if not os.path.exists(cg_json_path):
+                cmd = self._get_cmd_cg(binary, cg_json_path)
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            with open(cg_json_path, "r") as fin:
+                cg_raw = json.load(fin)
+
+            self.data[binary].cg_raw = cg_raw
+
+    def get_cfg_callgraph(self, binary, entry=None):
         self._load_cfg_raw(binary)
 
         if self.data[binary].cg is None:
@@ -152,6 +220,35 @@ class GhidraCfgExtractor(ICfgExtractor):
         if entry not in self.data[binary].cg.nodes:
             return nx.null_graph()
         return nx.ego_graph(self.data[binary].cg, entry, radius=sys.maxsize)
+
+    def get_accurate_callgraph(self, binary, entry=None):
+        self._load_accurate_cg_raw(binary)
+
+        if self.data[binary].acc_cg is None:
+            cg = nx.DiGraph()
+            for fun_raw in self.data[binary].cg_raw:
+                fun_addr = int(fun_raw["addr"], 16)
+                fun_name = fun_raw["name"]
+                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name))
+
+            for fun_raw in self.data[binary].cg_raw:
+                src = int(fun_raw["addr"], 16)
+                for call in fun_raw["calls"]:
+                    dst = int(call, 16)
+                    cg.add_edge(src, dst)
+
+            self.data[binary].acc_cg = cg
+
+        if entry is None:
+            return self.data[binary].acc_cg
+        if entry not in self.data[binary].acc_cg.nodes:
+            return nx.null_graph()
+        return nx.ego_graph(self.data[binary].acc_cg, entry, radius=sys.maxsize)
+
+    def get_callgraph(self, binary, entry=None):
+        if self.use_accurate:
+            return self.get_accurate_callgraph(binary, entry)
+        return self.get_cfg_callgraph(binary, entry)
 
     def get_cfg(self, binary, addr):
         self._load_cfg_raw(binary)
