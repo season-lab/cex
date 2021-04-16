@@ -53,22 +53,24 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 			pout.format("  {\n" + "    \"name\": \"%s\",\n" + "    \"addr\": \"%#x\",\n" + "    \"calls\": [\n",
 					f.getName(), f.getEntryPoint().getOffset());
 
-			boolean need_comma = false;
-			Iterator<PcodeOpAST> opcodes_iter = h.getPcodeOps();
-			while (opcodes_iter.hasNext()) {
-				PcodeOpAST op = opcodes_iter.next();
-				if (op.getOpcode() != PcodeOp.CALL)
-					continue;
+			if (h != null) {
+				boolean need_comma = false;
+				Iterator<PcodeOpAST> opcodes_iter = h.getPcodeOps();
+				while (opcodes_iter.hasNext()) {
+					PcodeOpAST op = opcodes_iter.next();
+					if (op.getOpcode() != PcodeOp.CALL)
+						continue;
 
-				if (need_comma) {
-					pout.format(",\n");
-				} else {
-					need_comma = true;
+					if (need_comma) {
+						pout.format(",\n");
+					} else {
+						need_comma = true;
+					}
+
+					Address target = op.getInput(0).getAddress();
+
+					pout.format("      \"%#x\"", target.getOffset());
 				}
-				
-				Address target = op.getInput(0).getAddress();
-
-				pout.format("      \"%#x\"", target.getOffset());
 			}
 
 			if (iter_functions.hasNext())
