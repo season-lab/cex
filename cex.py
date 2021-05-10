@@ -25,6 +25,33 @@ class CEX(object):
         graphs = list(map(lambda p: p.get_cfg(binary, addr), plugins))
         return CEX.merge_cfgs(*graphs)
 
+    def get_icfg(self, binary, addr, plugins):
+        # TODO: edges from ret to caller
+        icfg    = nx.DiGraph()
+        visited = set()
+        stack   = [addr]
+        while stack:
+            addr = stack.pop()
+            if addr in visited:
+                continue
+            visited.add(addr)
+
+            cfg  = self.get_cfg(binary, addr, plugins)
+            if cfg is None:
+                continue
+
+            for node_addr in cfg.nodes:
+                node = cfg.nodes[node_addr]["data"]
+                for call in node.calls:
+                    stack.append(call)
+                    icfg.add_edge(node_addr, call)
+                icfg.add_node(node_addr, data=node)
+
+            for src, dst in cfg.edges:
+                icfg.add_edge(src, dst)
+
+        return icfg
+
     def find_path(self, binary, src_addr, dst_addr, plugins=None, include_cfgs=True):
         plugins = plugins or [self.default_plugin]
         callgraph = self.get_callgraph(binary, src_addr, plugins)
