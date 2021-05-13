@@ -8,12 +8,11 @@ from cfg_extractors.utils import check_pie
 
 
 class AngrBinaryData(object):
-    def __init__(self, proj, angr_cfg, angr_cg, cg, cfg):
-        self.proj     = proj
-        self.angr_cfg = angr_cfg
-        self.angr_cg  = angr_cg
-        self.cg       = cg
-        self.cfg      = cfg
+    def __init__(self, proj, angr_cfgs, cg, cfg):
+        self.proj      = proj
+        self.angr_cfgs = angr_cfgs
+        self.cg        = cg
+        self.cfg       = cfg
 
 
 class AngrCfgExtractor(ICfgExtractor):
@@ -26,50 +25,51 @@ class AngrCfgExtractor(ICfgExtractor):
         if binary not in self.data:
             load_options={'main_opts': {}}
             if check_pie(binary):
-                load_options['custom_base_addr'] = 0x400000
+                load_options['main_opts']['base_addr'] = 0x400000
             self.data[binary] = AngrBinaryData(
                 proj=angr.Project(binary, auto_load_libs=False, load_options=load_options),
-                angr_cfg=None,
-                angr_cg=None,
+                angr_cfgs=dict(),
                 cg=dict(),
                 cfg=dict())
 
-    def _get_angr_cfg(self, proj):
+    def _get_angr_cfg(self, proj, addr):
         # Look in subclasses
         raise NotImplementedError
 
-    def _build_angr_cfg_cg(self, binary):
+    def _build_angr_cfg_cg(self, binary, addr):
         self._build_project(binary)
 
-        if self.data[binary].angr_cfg is None:
-            self.data[binary].angr_cfg = self._get_angr_cfg(self.data[binary].proj)
-            self.data[binary].angr_cg  = self.data[binary].angr_cfg.functions.callgraph
+        if addr not in self.data[binary].angr_cfgs:
+            self.data[binary].angr_cfgs[addr] = \
+                self._get_angr_cfg(self.data[binary].proj, addr)
 
     def _build_cg(self, binary, entry):
-        self._build_angr_cfg_cg(binary)
+        self._build_angr_cfg_cg(binary, entry)
 
         if entry not in self.data[binary].cg:
             g = nx.DiGraph()
-            for src, dst in nx.dfs_edges(self.data[binary].angr_cg, source=entry):
-                if src not in self.data[binary].angr_cfg.functions or dst not in self.data[binary].angr_cfg.functions:
+            for src, dst, c in self.data[binary].angr_cfgs[entry].functions.callgraph.edges:
+                if c != 0:
+                    continue
+                if src not in self.data[binary].proj.kb.functions or dst not in self.data[binary].proj.kb.functions:
                     sys.stderr.write("ERROR: %#x or %#x is in callgraph, but there is no CFG\n" % (src, dst))
                     continue
                 if src not in g.nodes:
-                    g.add_node(src, data=CGNodeData(addr=src, name=self.data[binary].angr_cfg.functions[src].name))
+                    g.add_node(src, data=CGNodeData(addr=src, name=self.data[binary].proj.kb.functions[src].name))
                 if dst not in g.nodes:
-                    g.add_node(dst, data=CGNodeData(addr=dst, name=self.data[binary].angr_cfg.functions[dst].name))
+                    g.add_node(dst, data=CGNodeData(addr=dst, name=self.data[binary].proj.kb.functions[dst].name))
                 g.add_edge(src, dst)
 
             self.data[binary].cg[entry] = g
 
     def _build_cfg(self, binary, addr):
-        self._build_angr_cfg_cg(binary)
+        self._build_angr_cfg_cg(binary, addr)
 
-        if addr not in self.data[binary].angr_cfg.functions:
+        if addr not in self.data[binary].proj.kb.functions:
             raise FunctionNotFoundException(addr)
 
         if addr not in self.data[binary].cfg:
-            fun = self.data[binary].angr_cfg.functions[addr]
+            fun = self.data[binary].proj.kb.functions[addr]
             g   = nx.DiGraph()
 
             # fun_cfg   = to_supergraph(fun.transition_graph_ex(exception_edges=True))

@@ -1,12 +1,9 @@
 from cfg_extractors.angr_plugin.common import AngrCfgExtractor
 
 class AngrCfgExtractorFast(AngrCfgExtractor):
-    def _get_angr_cfg(self, proj):
-        temp_cfb = proj.analyses.CFB(exclude_region_types={'kernel', 'tls'})
+    def _get_angr_cfg(self, proj, addr):
         return proj.analyses.CFG(
             normalize=False,
             use_patches=True,
-            cfb=temp_cfb,
-            # data_references=True,
-            # cross_references=True,
+            starts=[addr],
             resolve_indirect_jumps=True)
