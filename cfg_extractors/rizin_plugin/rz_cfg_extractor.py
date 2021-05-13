@@ -48,7 +48,7 @@ class RZCfgExtractor(ICfgExtractor):
         if not RZCfgExtractor.USE_PROJECTS or not os.path.exists(proj_name):
             flags=list()
             if check_pie(binary):
-                flags.append("-B 0x400000")
+                flags.extend(["-B", "0x400000", "-e", "io.cache=true"])
             rz = rzpipe.open(binary, flags=flags)
             # rz.cmd("e analysis.jmp.tbl=true")   # | jmp table detection (experimental)
             # rz.cmd("e analysis.jmp.indir=true") # | https://book.rizin.re/analysis/code_analysis.html#jump-tables
@@ -65,7 +65,7 @@ class RZCfgExtractor(ICfgExtractor):
 
     def loadable(self):
         try:
-            subprocess.check_call(["rz", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.check_call(["rizin", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return True
         except:
             return False
@@ -95,7 +95,7 @@ class RZCfgExtractor(ICfgExtractor):
                 for dst_raw in src_raw["callrefs"]:
                     if dst_raw["type"] != "CALL":
                         continue
-                    dst = dst_raw["addr"]
+                    dst = dst_raw["to"]
                     if dst not in cg.nodes:
                         symb_name = RZCfgExtractor._get_symbol_name(rz, dst)
                         if symb_name is None:
