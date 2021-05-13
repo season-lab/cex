@@ -87,7 +87,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         super().__init__()
         self.data = dict()
 
-        self.use_accurate = False
+        self.use_accurate = True
 
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
