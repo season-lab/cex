@@ -102,6 +102,8 @@ class ICfgExtractor(IPlugin):
         return True
 
     def get_callgraph(self, binary, entry=None):
+        # FIXME: in all plugins the callgraph should be a MultiGraph
+        #        where each edge has the callsite info
         raise NotImplementedError
 
     def get_cfg(self, binary, addr):
