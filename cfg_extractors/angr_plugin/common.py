@@ -8,9 +8,9 @@ from cfg_extractors.utils import check_pie
 
 
 class AngrBinaryData(object):
-    def __init__(self, proj, angr_cfgs, cg, cfg):
+    def __init__(self, proj, processed, cg, cfg):
         self.proj      = proj
-        self.angr_cfgs = angr_cfgs
+        self.processed = processed
         self.cg        = cg
         self.cfg       = cfg
 
@@ -28,7 +28,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 load_options['main_opts']['base_addr'] = 0x400000
             self.data[binary] = AngrBinaryData(
                 proj=angr.Project(binary, auto_load_libs=False, load_options=load_options),
-                angr_cfgs=dict(),
+                processed=set(),
                 cg=dict(),
                 cfg=dict())
 
@@ -39,16 +39,20 @@ class AngrCfgExtractor(ICfgExtractor):
     def _build_angr_cfg_cg(self, binary, addr):
         self._build_project(binary)
 
-        if addr not in self.data[binary].angr_cfgs:
-            self.data[binary].angr_cfgs[addr] = \
-                self._get_angr_cfg(self.data[binary].proj, addr)
+        if addr not in self.data[binary].processed:
+            # I trust proj.kb
+            self._get_angr_cfg(self.data[binary].proj, addr)
+            self.data[binary].processed.add(addr)
 
     def _build_cg(self, binary, entry):
         self._build_angr_cfg_cg(binary, entry)
 
         if entry not in self.data[binary].cg:
+            callgraph = self.data[binary].proj.kb.callgraph
+            subgraph  = nx.ego_graph(callgraph, entry, radius=sys.maxsize)
+
             g = nx.DiGraph()
-            for src, dst, c in self.data[binary].angr_cfgs[entry].functions.callgraph.edges:
+            for src, dst, c in subgraph.edges:
                 if c != 0:
                     continue
                 if src not in self.data[binary].proj.kb.functions or dst not in self.data[binary].proj.kb.functions:
