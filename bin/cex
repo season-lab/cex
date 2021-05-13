@@ -61,7 +61,7 @@ def dump_dot_path(graph, outdir=None):
         print(dot)
         return
 
-    with open(os.path.join(outdir, "path-%s.dot" % addr), "w") as fout:
+    with open(os.path.join(outdir, "pat.dot"), "w") as fout:
         fout.write(dot)
 
 def to_num(addr):
