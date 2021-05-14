@@ -215,11 +215,8 @@ class GhidraCfgExtractor(ICfgExtractor):
                         cg.add_edge(src, dst)
             self.data[binary].cg = cg
 
-        if entry is None:
-            return self.data[binary].cg
-        if entry not in self.data[binary].cg.nodes:
-            return nx.null_graph()
-        return nx.ego_graph(self.data[binary].cg, entry, radius=sys.maxsize)
+        # Ignore entry, the caller is in charge of pruning the CG
+        return self.data[binary].cg
 
     def get_accurate_callgraph(self, binary, entry=None):
         self._load_accurate_cg_raw(binary)
@@ -239,11 +236,8 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             self.data[binary].acc_cg = cg
 
-        if entry is None:
-            return self.data[binary].acc_cg
-        if entry not in self.data[binary].acc_cg.nodes:
-            return nx.null_graph()
-        return nx.ego_graph(self.data[binary].acc_cg, entry, radius=sys.maxsize)
+        # Ignore entry, the caller is in charge of pruning the CG
+        return self.data[binary].acc_cg
 
     def get_callgraph(self, binary, entry=None):
         if self.use_accurate:

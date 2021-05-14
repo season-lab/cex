@@ -108,12 +108,9 @@ class RZCfgExtractor(ICfgExtractor):
             self.cache[binary].cg = cg
             rz.quit()
 
+        # Ignore entry, the caller is in charge of pruning the CG
         cg = self.cache[binary].cg
-        if entry is None or nx.number_of_nodes(cg) == 0:
-            return cg
-        if entry not in cg.nodes:
-            return nx.null_graph()
-        return nx.ego_graph(cg, entry, radius=sys.maxsize)
+        return cg
 
     def get_cfg(self, binary, addr):
         self.faddr_cache = dict()

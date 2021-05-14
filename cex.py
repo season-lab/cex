@@ -16,7 +16,10 @@ class CEX(object):
         plugins = list(map(lambda p: self.pm.get_plugin_by_name(p), plugins))
 
         graphs = list(map(lambda p: p.get_callgraph(binary, entry), plugins))
-        return CEX.merge_graphs(*graphs)
+        res    = CEX.merge_graphs(*graphs)
+        if entry is not None:
+            return nx.ego_graph(res, entry, radius=sys.maxsize)
+        return res
 
     def get_cfg(self, binary, addr, plugins=None):
         plugins = plugins or [self.default_plugin]
