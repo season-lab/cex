@@ -58,6 +58,11 @@ class AngrCfgExtractor(ICfgExtractor):
                 if src not in self.data[binary].proj.kb.functions or dst not in self.data[binary].proj.kb.functions:
                     sys.stderr.write("ERROR: %#x or %#x is in callgraph, but there is no CFG\n" % (src, dst))
                     continue
+                fun_src = self.data[binary].proj.kb.functions[src]
+                fun_dst = self.data[binary].proj.kb.functions[dst]
+                if fun_src.is_simprocedure or fun_dst.is_simprocedure:
+                    # Exclude SimProcedures
+                    continue
                 if src not in g.nodes:
                     g.add_node(src, data=CGNodeData(addr=src, name=self.data[binary].proj.kb.functions[src].name))
                 if dst not in g.nodes:
