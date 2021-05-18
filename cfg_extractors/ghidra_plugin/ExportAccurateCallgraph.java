@@ -12,6 +12,7 @@ import java.io.PrintStream;
 import java.io.FileOutputStream;
 
 import java.util.Iterator;
+import java.util.HashSet;
 
 public class ExportAccurateCallgraph extends HeadlessScript {
 
@@ -43,16 +44,34 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 		ifc.openProgram(currentProgram);
 
 		pout.format("[\n");
+
+		HashSet<Long> external_functions = new HashSet<>();
 		Listing listing = currentProgram.getListing();
-		FunctionIterator iter_functions = listing.getFunctions(true);
+		FunctionIterator iter_functions = listing.getExternalFunctions();
 		while (iter_functions.hasNext() && !monitor.isCancelled()) {
 			Function f = iter_functions.next();
-			DecompileResults dr = ifc.decompileFunction(f, 300, monitor);
-			HighFunction h = dr.getHighFunction();
+			for (Address a : f.getFunctionThunkAddresses())
+				external_functions.add(a.getOffset());
+		}
+
+		boolean f_need_comma = false;
+		iter_functions = listing.getFunctions(true);
+		while (iter_functions.hasNext() && !monitor.isCancelled()) {
+			Function f = iter_functions.next();
+			if (external_functions.contains(f.getEntryPoint().getOffset()))
+				continue;
+
+			if (f_need_comma)
+				pout.format(",\n");
+			else
+				f_need_comma = true;
+
 
 			pout.format("  {\n" + "    \"name\": \"%s\",\n" + "    \"addr\": \"%#x\",\n" + "    \"calls\": [\n",
 					f.getName(), f.getEntryPoint().getOffset());
 
+			DecompileResults dr = ifc.decompileFunction(f, 300, monitor);
+			HighFunction h = dr.getHighFunction();
 			if (h != null) {
 				boolean need_comma = false;
 				Iterator<PcodeOpAST> opcodes_iter = h.getPcodeOps();
@@ -61,22 +80,21 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 					if (op.getOpcode() != PcodeOp.CALL)
 						continue;
 
-					if (need_comma) {
-						pout.format(",\n");
-					} else {
-						need_comma = true;
-					}
-
 					Address target = op.getInput(0).getAddress();
+					if (external_functions.contains(target.getOffset()))
+						continue;
+
+					if (need_comma)
+						pout.format(",\n");
+					else
+						need_comma = true;
+
 
 					pout.format("      \"%#x\"", target.getOffset());
 				}
 			}
 
-			if (iter_functions.hasNext())
-				pout.format("\n    ]\n  },\n");
-			else
-				pout.format("\n    ]\n  }\n");
+			pout.format("\n    ]\n  }\n");
 		}
 		pout.format("]\n");
 

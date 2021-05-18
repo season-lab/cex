@@ -1,180 +1,170 @@
 import networkx as nx
 import sys
 
+from cfg_extractors import IMultilibCfgExtractor
 from cex_plugin_manager import CexPluginManager
-from cfg_extractors import ICfgExtractor
+from utils import merge_graphs, merge_cfgs, fix_graph_addresses
+from bininfo import BinInfo
+
+def print_err(*msg):
+    sys.stderr.write(" ".join(map(str, msg)) + "\n")
 
 
-class CEX(object):
+class CEXProject(object):
     default_plugin = "AngrFast"
+    pm             = CexPluginManager()
 
-    def __init__(self):
-        self.pm = CexPluginManager()
+    def __init__(self, main_binary: str, libs: list=None, plugins: list=None):
+        self.plugins = list(map(lambda p: CEXProject.pm.get_plugin_by_name(p), plugins or [CEXProject.default_plugin]))
+        self.multilib_plugins     = list(filter(lambda p: isinstance(p, IMultilibCfgExtractor), self.plugins))
+        self.non_multilib_plugins = list(filter(lambda p: not isinstance(p, IMultilibCfgExtractor), self.plugins))
 
-    def get_callgraph(self, binary, entry=None, plugins=None):
-        plugins = plugins or [self.default_plugin]
-        plugins = list(map(lambda p: self.pm.get_plugin_by_name(p), plugins))
+        self.bin  = BinInfo(main_binary, 0x400000)
+        print_err(self.bin)
+        self.libs = list()
 
-        graphs = list(map(lambda p: p.get_callgraph(binary, entry), plugins))
-        res    = CEX.merge_graphs(*graphs)
-        if entry is not None:
-            return nx.ego_graph(res, entry, radius=sys.maxsize)
-        return res
+        addr     = 0x7f000000
+        libs     = libs or list()
+        for lib in libs:
+            binfo = BinInfo(lib, addr)
+            print_err(binfo)
+            self.libs.append(binfo)
+            addr += binfo.size + 0x1000
+            addr  = addr - (addr % 0x1000)
 
-    def get_cfg(self, binary, addr, plugins=None):
-        plugins = plugins or [self.default_plugin]
-        plugins = list(map(lambda p: self.pm.get_plugin_by_name(p), plugins))
+        self._addresses = dict()
+        for b in [self.bin] + self.libs:
+            self._addresses[b.path] = b.addr
+        self._libs_paths = list(map(lambda l: l.path, self.libs))
 
-        graphs = list(map(lambda p: p.get_cfg(binary, addr), plugins))
-        return CEX.merge_cfgs(*graphs)
+        self._lib_dep_graph       = None
+        self._lib_dep_graph_edges = dict()
 
-    def get_icfg(self, binary, addr, plugins):
-        # TODO: edges from ret to caller
-        icfg    = nx.DiGraph()
-        visited = set()
-        stack   = [addr]
-        while stack:
-            addr = stack.pop()
-            if addr in visited:
-                continue
-            visited.add(addr)
+    def get_bin_containing(self, addr):
+        for b in [self.bin] + self.libs:
+            if b.contains_addr(addr):
+                return b
+        return None
 
-            cfg  = self.get_cfg(binary, addr, plugins)
-            if cfg is None:
-                continue
+    def get_bininfo(self, name):
+        for b in [self.bin] + self.libs:
+            if b.name == name:
+                return b
+        return None
 
-            for node_addr in cfg.nodes:
-                node = cfg.nodes[node_addr]["data"]
-                for call in node.calls:
-                    stack.append(call)
-                    icfg.add_edge(node_addr, call)
-                icfg.add_node(node_addr, data=node)
+    def _fix_addresses(self, g, b):
+        if b.path != self.bin.path:
+            g = fix_graph_addresses(g, b.addr - 0x400000)
+        return g
 
-            for src, dst in cfg.edges:
-                icfg.add_edge(src, dst)
+    def get_callgraph(self, addr=None):
+        b = self.bin if addr is None else self.get_bin_containing(addr)
+        if b is None:
+            return None
 
-        return icfg
+        if len([self.bin] + self.libs) == 1:
+            graphs = list(map(lambda p: p.get_callgraph(b.path, addr), self.plugins))
+            res    = merge_graphs(*graphs)
+            res    = self._fix_addresses(res, b)
+            if addr is not None:
+                return nx.ego_graph(res, addr, radius=sys.maxsize)
+            return res
 
-    def find_path(self, binary, src_addr, dst_addr, plugins=None, include_cfgs=True):
-        plugins = plugins or [self.default_plugin]
-        callgraph = self.get_callgraph(binary, src_addr, plugins)
-        if nx.number_of_nodes(callgraph) == 0 or dst_addr not in callgraph:
-            return []
-        cg_path = nx.shortest_path(callgraph, src_addr, dst_addr)
-        if not include_cfgs:
-            return list(map(lambda n_addr: callgraph.nodes[n_addr]["data"], cg_path))
+        self.get_depgraph()
 
-        def find_path_in_cfg(fun_addr, callee):
-            cfg = self.get_cfg(binary, fun_addr, plugins)
-            assert cfg is not None # this should not happen, since the functions are taken from the CG
-
-            nodes_callee = list(filter(lambda n_addr: callee in cfg.nodes[n_addr]["data"].calls, cfg.nodes))
-            if len(nodes_callee) == 0:
-                # This should not happen...
-                sys.stderr.write("ERROR: edge in CG between %#x and %#x, but %#x is not in the CFG of %#x\n" % \
-                    (fun_addr, callee, callee, fun_addr))
-                return list()
-
-            node_callee  = nodes_callee[0]
-            if not nx.has_path(cfg, fun_addr, node_callee):
-                sys.stderr.write("WARNING: no path between %#x and %#x in the CFG of %#x (non-connected graph?)\n" % \
-                    (fun_addr, node_callee, fun_addr))
-                return list()
-
-            return list(map(lambda n_addr: cfg.nodes[n_addr]["data"], nx.shortest_path(cfg, fun_addr, node_callee)))
-
-        path = list()
-        for i in range(len(cg_path)-1):
-            src, dst = cg_path[i:i+2]
-            path    += find_path_in_cfg(src, dst)
-        return path
-
-    @staticmethod
-    def explode_cfg(g):
-        res_g = nx.DiGraph()
-
-        exploded_nodes = dict()
-        for n_id in g.nodes:
-            node_data = g.nodes[n_id]["data"]
-            nodes = node_data.explode()
-
-            for n in nodes:
-                res_g.add_node(n.addr, data=n)
-
-            for src, dst in zip(nodes, nodes[1:]):
-                res_g.add_edge(src.addr, dst.addr)
-
-            if len(nodes) > 1:
-                exploded_nodes[n_id] = nodes[-1].addr
-
-        for src_id, dst_id in g.edges:
-            if src_id in exploded_nodes:
-                src_id = exploded_nodes[src_id]
-            res_g.add_edge(src_id, dst_id)
-        return res_g
-
-    @staticmethod
-    def merge_cfgs(*graphs):
-        if len(graphs) == 1:
-            return graphs[0]
-
-        exploded_graphs = list(map(CEX.explode_cfg, graphs))
-        merged          = CEX.merge_graphs(*exploded_graphs)
-        return ICfgExtractor.normalize_graph(merged)
-
-    @staticmethod
-    def merge_graphs(*graphs):
-        if len(graphs) == 1:
-            return graphs[0]
-
-        visited   = set()
-        res_graph = nx.DiGraph()
-        for g in graphs:
+        def get_involved_libs(g):
+            libs = set()
             for n_id in g.nodes:
-                if n_id in visited:
-                    continue
-                visited.add(n_id)
-                res_graph.add_node(n_id, data=g.nodes[n_id]["data"])
+                binfo = self.get_bin_containing(n_id)
+                assert binfo is not None
+                libs.add(binfo)
 
-        for g in graphs:
-            for src_id, dst_id in g.edges:
-                res_graph.add_edge(src_id, dst_id)
+                if n_id in self._lib_dep_graph_edges:
+                    dst_addr = self._lib_dep_graph_edges[n_id]
+                    binfo = self.get_bin_containing(dst_addr)
+                    assert binfo is not None
+                    libs.add(binfo)
+            return libs
 
-        return res_graph
+        def add_depgraph_edges(g):
+            for src in self._lib_dep_graph_edges:
+                dst = self._lib_dep_graph_edges[src]
+                if src in g.nodes and dst in g.nodes:
+                    g.add_edge(src, dst)
+            return g
 
-    @staticmethod
-    def rebase_addr(addr):
-        return addr + 0x400000
+        graphs = list(map(lambda p: p.get_multi_callgraph(
+            b.path, self._libs_paths, addr, self._addresses), self.multilib_plugins))
+        res = merge_graphs(*graphs)
 
-    @staticmethod
-    def to_dot(graph):
-        header  = "digraph {\n\tnode [shape=box];\n"
-        header += "\tgraph [fontname = \"monospace\"];\n"
-        header += "\tnode  [fontname = \"monospace\"];\n"
-        header += "\tedge  [fontname = \"monospace\"];\n"
-        footer  = "}\n"
+        processed = set()
+        stack     = [b]
+        while stack:
+            b = stack.pop()
 
-        body = ""
-        for node_id in graph.nodes:
-            node = graph.nodes[node_id]
-            body += "\tnode_%x [label=\"%s\"];\n" % (node["data"].addr, node["data"].get_dot_label())
-        body += "\n"
-        for src_id, dst_id in graph.edges:
-            src = graph.nodes[src_id]
-            dst = graph.nodes[dst_id]
-            body += "\tnode_%x -> node_%x;\n" % (src["data"].addr, dst["data"].addr)
+            assert b not in processed
+            processed.add(b)
 
-        return header + body + footer
+            graphs = list(map(lambda p: p.get_callgraph(b.path, None), self.non_multilib_plugins))
+            g      = merge_graphs(*graphs)
+            g      = self._fix_addresses(g, b)
 
-    @staticmethod
-    def to_json(graph):
-        res = "[%s]" % ", ".join(
-            map(
-                lambda n_id: graph.nodes[n_id]["data"].get_json(list(map(lambda x: x[1], graph.out_edges(n_id)))),
-                graph.nodes))
+            res = merge_graphs(res, g)
+            res = add_depgraph_edges(res)
+            if addr is not None:
+                res = nx.ego_graph(res, addr, radius=sys.maxsize)
+
+            for lib in get_involved_libs(res):
+                if lib not in processed:
+                    stack.append(lib)
+
         return res
+
+    def get_cfg(self, addr=None):
+        b = self.get_bin_containing(addr)
+        if b is None:
+            return None
+
+        if addr is not None:
+            addr = addr - b.addr + 0x400000
+
+        graphs = list(map(lambda p: p.get_cfg(b.path, addr), self.plugins))
+        merged = merge_cfgs(*graphs)
+        if merged is None:
+            return None
+        merged = self._fix_addresses(merged, b)
+        return merged
+
+    def get_depgraph(self):
+        if self._lib_dep_graph is not None:
+            return self._lib_dep_graph
+
+        bins = [self.bin] + self.libs
+
+        g = nx.MultiDiGraph()
+        for bin_src in bins:
+            if bin_src.hash not in g.nodes:
+                g.add_node(bin_src.hash)
+
+            for fun_src in bin_src.imported_functions:
+                for bin_dst in bins:
+                    if bin_src.hash == bin_dst.hash:
+                        continue
+
+                    for fun_dst in bin_dst.exported_functions:
+                        if fun_src.name != fun_dst.name:
+                            continue
+
+                        if bin_dst.hash not in g.nodes:
+                            g.add_node(bin_dst.hash)
+                        g.add_edge(bin_src.hash, bin_dst.hash, fun=fun_src.name,
+                            src_off=fun_src.offset, dst_off=fun_dst.offset)
+                        self._lib_dep_graph_edges[fun_src.offset] = fun_dst.offset
+
+        self._lib_dep_graph = g
+        return self._lib_dep_graph
 
     def clear_plugins_cache(self):
-        for pname in self.pm.get_plugin_names():
-            plugin = self.pm.get_plugin_by_name(pname)
+        for pname in CEXProject.pm.get_plugin_names():
+            plugin = CEXProject.pm.get_plugin_by_name(pname)
             plugin.clear_cache()
