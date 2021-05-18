@@ -23,8 +23,8 @@ class CEXProject(object):
         print_err(self.bin)
         self.libs = list()
 
-        addr     = 0x7f000000
-        libs     = libs or list()
+        addr = 0x7f000000
+        libs = libs or list()
         for lib in libs:
             binfo = BinInfo(lib, addr)
             print_err(binfo)

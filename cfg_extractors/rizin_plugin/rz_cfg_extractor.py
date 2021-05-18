@@ -133,8 +133,8 @@ class RZCfgExtractor(ICfgExtractor):
             ops_with_call = list()
             for i, op in enumerate(block["ops"]):
                 call_refs = list()
-                if "refs" in op:
-                    for ref_raw in op["refs"]:
+                if "xrefs_from" in op:
+                    for ref_raw in op["xrefs_from"]:
                         if ref_raw["type"] == "CALL":
                             call_refs.append(ref_raw["addr"])
                     if len(call_refs) > 0:
