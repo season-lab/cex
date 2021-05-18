@@ -1,11 +1,11 @@
-import subprocess
 import hashlib
+import rzpipe
 
 def check_pie(binary):
-    file_output = subprocess.check_output(["file", binary])
-    if b"LSB shared object" in file_output or b"LSB pie executable" in file_output:
-        return True
-    return False
+    rz  = rzpipe.open(binary, flags=["-2"])
+    res = rz.cmdj("iIj")["pic"]
+    rz.quit()
+    return res
 
 def get_md5_file(filename):
     with open(filename,'rb') as f_binary:

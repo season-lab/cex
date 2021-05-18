@@ -101,8 +101,8 @@ class CEXProject(object):
         stack     = [b]
         while stack:
             b = stack.pop()
-
-            assert b not in processed
+            if b in processed:
+                continue
             processed.add(b)
 
             graphs = list(map(lambda p: p.get_callgraph(b.path, None), self.non_multilib_plugins))
