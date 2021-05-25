@@ -169,3 +169,7 @@ class CEXProject(object):
         for pname in CEXProject.pm.get_plugin_names():
             plugin = CEXProject.pm.get_plugin_by_name(pname)
             plugin.clear_cache()
+
+    @staticmethod
+    def rebase_addr(addr):
+        return addr + 0x400000
