@@ -77,6 +77,31 @@ class GhidraCfgExtractor(ICfgExtractor):
         "-scriptPath",
         os.path.realpath(os.path.dirname(__file__))]
 
+    CMD_CUSTOM_FUNCTIONS_USE_EXISTING = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-noanalysis",
+        "-process",
+        "$BINARY",
+        "-postScript",
+        "CreateFunctions.java",
+        "$INFILE",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__))]
+
+    CMD_CUSTOM_FUNCTIONS_NEW = [
+        "$GHIDRA_HOME/support/analyzeHeadless",
+        "$PROJ_FOLDER",
+        "$PROJ_NAME",
+        "-import",
+        "$BINARY",
+        "-postScript",
+        "CreateFunctions.java",
+        "$INFILE",
+        "-scriptPath",
+        os.path.realpath(os.path.dirname(__file__))]
+
     CMD_PIE_ELF = [
         "-loader",
         "ElfLoader",
@@ -111,8 +136,33 @@ class GhidraCfgExtractor(ICfgExtractor):
             subprocess.check_call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
         return proj_path
 
+    def _get_cmd_custom_functions(self, binary, infile):
+        binary_fullpath = binary
+        ghidra_home     = os.environ["GHIDRA_HOME"]
+
+        binary_md5 = get_md5_file(binary)
+        proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
+        if os.path.exists(os.path.join(self.get_tmp_folder(), proj_name)):
+            cmd = GhidraCfgExtractor.CMD_CUSTOM_FUNCTIONS_USE_EXISTING[:]
+            binary = os.path.basename(binary)
+        else:
+            cmd = GhidraCfgExtractor.CMD_CUSTOM_FUNCTIONS_NEW[:]
+
+        for i in range(len(cmd)):
+            cmd[i] = cmd[i]                                     \
+                .replace("$GHIDRA_HOME", ghidra_home)           \
+                .replace("$BINARY", binary)                     \
+                .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
+                .replace("$PROJ_NAME", proj_name)               \
+                .replace("$INFILE", infile)
+
+        if check_pie(binary_fullpath):
+            cmd += GhidraCfgExtractor.CMD_PIE_ELF
+        return cmd
+
     def _get_cmd_cfg(self, binary, outfile):
-        ghidra_home = os.environ["GHIDRA_HOME"]
+        binary_fullpath = binary
+        ghidra_home     = os.environ["GHIDRA_HOME"]
 
         binary_md5 = get_md5_file(binary)
         proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
@@ -130,12 +180,13 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$PROJ_NAME", proj_name)               \
                 .replace("$OUTFILE", outfile)
 
-        if check_pie(binary):
+        if check_pie(binary_fullpath):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
 
     def _get_cmd_cg(self, binary, outfile):
-        ghidra_home = os.environ["GHIDRA_HOME"]
+        binary_fullpath = binary
+        ghidra_home     = os.environ["GHIDRA_HOME"]
 
         binary_md5 = get_md5_file(binary)
         proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
@@ -153,7 +204,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$PROJ_NAME", proj_name)               \
                 .replace("$OUTFILE", outfile)
 
-        if check_pie(binary):
+        if check_pie(binary_fullpath):
             cmd += GhidraCfgExtractor.CMD_PIE_ELF
         return cmd
 
@@ -190,6 +241,15 @@ class GhidraCfgExtractor(ICfgExtractor):
                 cg_raw = json.load(fin)
 
             self.data[binary].cg_raw = cg_raw
+
+    def define_functions(self, binary, offsets):
+        infile = "/dev/shm/offsets.txt"
+        with open(infile, "w") as fout:
+            for off in offsets:
+                fout.write("%#x\n" % off)
+
+        cmd = self._get_cmd_custom_functions(binary, infile)
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def get_cfg_callgraph(self, binary, entry=None):
         self._load_cfg_raw(binary)

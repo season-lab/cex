@@ -18,7 +18,6 @@ class BinInfo(object):
         self.exported_functions = list()
 
         rz = self._open_rz()
-        rz.cmd("aa")
 
         laddr = rz.cmdj("iIj")["laddr"]
 

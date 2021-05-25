@@ -20,14 +20,12 @@ class CEXProject(object):
         self.non_multilib_plugins = list(filter(lambda p: not isinstance(p, IMultilibCfgExtractor), self.plugins))
 
         self.bin  = BinInfo(main_binary, 0x400000)
-        print_err(self.bin)
         self.libs = list()
 
         addr = 0x7f000000
         libs = libs or list()
         for lib in libs:
             binfo = BinInfo(lib, addr)
-            print_err(binfo)
             self.libs.append(binfo)
             addr += binfo.size + 0x1000
             addr  = addr - (addr % 0x1000)
@@ -39,6 +37,9 @@ class CEXProject(object):
 
         self._lib_dep_graph       = None
         self._lib_dep_graph_edges = dict()
+
+    def get_bins(self):
+        return [self.bin] + self.libs
 
     def get_bin_containing(self, addr):
         for b in [self.bin] + self.libs:
