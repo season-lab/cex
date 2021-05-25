@@ -164,7 +164,8 @@ class CEXProject(object):
         self._lib_dep_graph = g
         return self._lib_dep_graph
 
-    def clear_plugins_cache(self):
+    @staticmethod
+    def clear_plugins_cache():
         for pname in CEXProject.pm.get_plugin_names():
             plugin = CEXProject.pm.get_plugin_by_name(pname)
             plugin.clear_cache()
