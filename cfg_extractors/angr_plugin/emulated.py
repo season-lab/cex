@@ -75,26 +75,20 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
         self._get_angr_cfg(proj, entry)
 
-        callgraph = proj.kb.callgraph
-        subgraph  = nx.ego_graph(callgraph, entry, radius=sys.maxsize)
-
-        g = nx.DiGraph()
-        for src, dst, c in subgraph.edges:
-            if c != 0:
-                continue
-            if src not in proj.kb.functions or dst not in proj.kb.functions:
-                sys.stderr.write("ERROR: %#x or %#x is in callgraph, but there is no CFG\n" % (src, dst))
-                continue
+        g = nx.MultiDiGraph()
+        for src in proj.kb.functions:
             fun_src = proj.kb.functions[src]
-            fun_dst = proj.kb.functions[dst]
-            if fun_src.is_simprocedure or fun_dst.is_simprocedure:
-                # Exclude SimProcedures
-                continue
             if src not in g.nodes:
-                g.add_node(src, data=CGNodeData(addr=src, name=proj.kb.functions[src].name))
-            if dst not in g.nodes:
-                g.add_node(dst, data=CGNodeData(addr=dst, name=proj.kb.functions[dst].name))
-            g.add_edge(src, dst)
+                g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name))
 
-        self.multi_cache[h].cg[entry] = g
-        return g
+            for block_with_call_addr in fun_src.get_call_sites():
+                callsite = fun_src.get_block(block_with_call_addr).instruction_addrs[-1]
+                dst = fun_src.get_call_target(block_with_call_addr)
+                fun_dst = proj.kb.functions[dst]
+                if dst not in g.nodes:
+                    g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
+
+                g.add_edge(src, dst, callsite=callsite)
+
+        self.multi_cache[h].cg[entry] = nx.ego_graph(g, entry, radius=sys.maxsize)
+        return self.multi_cache[h].cg[entry]

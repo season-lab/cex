@@ -79,7 +79,7 @@ class RZCfgExtractor(ICfgExtractor):
         if self.cache[binary].cg is None:
             rz        = self._open_rz(binary)
             functions = rz.cmdj("aflj")
-            cg        = nx.DiGraph()
+            cg        = nx.MultiDiGraph()
 
             for fun in functions:
                 addr = fun["offset"]
@@ -95,7 +95,8 @@ class RZCfgExtractor(ICfgExtractor):
                 for dst_raw in src_raw["callrefs"]:
                     if dst_raw["type"] != "CALL":
                         continue
-                    dst = dst_raw["to"]
+                    dst      = dst_raw["to"]
+                    callsite = dst_raw["from"]
                     if dst not in cg.nodes:
                         symb_name = RZCfgExtractor._get_symbol_name(rz, dst)
                         if symb_name is None:
@@ -103,7 +104,7 @@ class RZCfgExtractor(ICfgExtractor):
                             continue
                         # External function. Add to CG
                         cg.add_node(dst, data=CGNodeData(addr=dst, name=symb_name))
-                    cg.add_edge(src, dst)
+                    cg.add_edge(src, dst, callsite=callsite)
 
             self.cache[binary].cg = cg
             rz.quit()

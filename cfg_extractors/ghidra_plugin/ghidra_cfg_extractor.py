@@ -282,7 +282,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         self._load_accurate_cg_raw(binary)
 
         if self.data[binary].acc_cg is None:
-            cg = nx.DiGraph()
+            cg = nx.MultiDiGraph()
             for fun_raw in self.data[binary].cg_raw:
                 fun_addr = int(fun_raw["addr"], 16)
                 fun_name = fun_raw["name"]
@@ -291,8 +291,9 @@ class GhidraCfgExtractor(ICfgExtractor):
             for fun_raw in self.data[binary].cg_raw:
                 src = int(fun_raw["addr"], 16)
                 for call in fun_raw["calls"]:
-                    dst = int(call, 16)
-                    cg.add_edge(src, dst)
+                    dst      = int(call["offset"], 16)
+                    callsite = int(call["callsite"], 16)
+                    cg.add_edge(src, dst, callsite=callsite)
 
             self.data[binary].acc_cg = cg
 

@@ -90,7 +90,8 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 						need_comma = true;
 
 
-					pout.format("      \"%#x\"", target.getOffset());
+					pout.format("      { \"offset\": \"%#x\", \"callsite\" : \"%#x\" }",
+						target.getOffset(), op.getSeqnum().getTarget().getOffset());
 				}
 			}
 

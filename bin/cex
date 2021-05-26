@@ -88,10 +88,12 @@ def main(args):
     libs   = args.libs
     proj   = CEXProject(binary, libs=libs, plugins=plugins)
 
-    cgs_dot   = args.dump_dot_cg or []
-    cfgs_dot  = args.dump_dot_cfg or []
-    cgs_json  = args.dump_json_cg or []
-    cfgs_json = args.dump_json_cfg or []
+    cgs_dot    = args.dump_dot_cg or []
+    icfgs_dot  = args.dump_dot_icfg or []
+    cfgs_dot   = args.dump_dot_cfg or []
+    cgs_json   = args.dump_json_cg or []
+    icfgs_json = args.dump_json_icfg or []
+    cfgs_json  = args.dump_json_cfg or []
     for cg_addr in cgs_dot:
         if cg_addr == "-":
             cg_addr = None
@@ -107,6 +109,14 @@ def main(args):
             cg_addr = to_num(cg_addr)
         graph = proj.get_callgraph(cg_addr)
         dump_json_cg(cg_addr, graph, args.output)
+
+    for icfg_addr in icfgs_dot:
+        graph = proj.get_icfg(to_num(icfg_addr))
+        dump_dot_cfg(icfg_addr, graph, args.output)
+
+    for icfg_addr in icfgs_json:
+        graph = proj.get_cfg(to_num(icfg_addr))
+        dump_json_cfg(icfg_addr, graph, args.output)
 
     for cfg_addr in cfgs_dot:
         graph = proj.get_cfg(to_num(cfg_addr))
@@ -125,6 +135,8 @@ if __name__=="__main__":
     parser.add_argument("--output", metavar="DIRECTORY", help="Output directory. If omitted, stdout")
     parser.add_argument("--dump-dot-cg", metavar="ADDR", help="Dump the callgraph in dot from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
     parser.add_argument("--dump-json-cg", metavar="ADDR", help="Dump the callgraph in json from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
+    parser.add_argument("--dump-dot-icfg", metavar="ADDR", help="Dump the interprocedural CFG in dot from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
+    parser.add_argument("--dump-json-icfg", metavar="ADDR", help="Dump the interprocedural CFG in json from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
     parser.add_argument("--dump-dot-cfg", metavar="ADDR", help="Dump the control flow graph of the function in dot at address ADDR", nargs="*")
     parser.add_argument("--dump-json-cfg", metavar="ADDR", help="Dump the control flow graph of the function in json at address ADDR", nargs="*")
     parser.add_argument("binary", help="The binary to analyze")

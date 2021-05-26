@@ -3,7 +3,7 @@ import sys
 
 from cfg_extractors import IMultilibCfgExtractor
 from cex_plugin_manager import CexPluginManager
-from utils import merge_graphs, merge_cfgs, fix_graph_addresses
+from utils import merge_cgs, merge_cfgs, fix_graph_addresses, explode_cfg, normalize_graph
 from bininfo import BinInfo
 
 def print_err(*msg):
@@ -65,7 +65,7 @@ class CEXProject(object):
 
         if len([self.bin] + self.libs) == 1:
             graphs = list(map(lambda p: p.get_callgraph(b.path, addr), self.plugins))
-            res    = merge_graphs(*graphs)
+            res    = merge_cgs(*graphs)
             res    = self._fix_addresses(res, b)
             if addr is not None:
                 return nx.ego_graph(res, addr, radius=sys.maxsize)
@@ -96,7 +96,7 @@ class CEXProject(object):
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
             b.path, self._libs_paths, addr, self._addresses), self.multilib_plugins))
-        res = merge_graphs(*graphs)
+        res = merge_cgs(*graphs)
 
         processed = set()
         stack     = [b]
@@ -107,10 +107,10 @@ class CEXProject(object):
             processed.add(b)
 
             graphs = list(map(lambda p: p.get_callgraph(b.path, None), self.non_multilib_plugins))
-            g      = merge_graphs(*graphs)
+            g      = merge_cgs(*graphs)
             g      = self._fix_addresses(g, b)
 
-            res = merge_graphs(res, g)
+            res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
             if addr is not None:
                 res = nx.ego_graph(res, addr, radius=sys.maxsize)
@@ -135,6 +135,74 @@ class CEXProject(object):
             return None
         merged = self._fix_addresses(merged, b)
         return merged
+
+    def get_icfg(self, entry=None):
+        cg = self.get_callgraph(entry)
+
+        res_g = nx.DiGraph()
+        def add_cfg(addr):
+            cfg = self.get_cfg(addr)
+            cfg = explode_cfg(cfg)
+
+            for addr in cfg.nodes:
+                bb = cfg.nodes[addr]["data"]
+                res_g.add_node(addr, data=bb)
+
+            for src, dst in cfg.edges:
+                res_g.add_edge(src, dst)
+
+            return cfg
+
+        def is_return(bb):
+            # Superdumb... Improve it
+            return ": ret" in bb.get_dot_label().lower() or ": bx lr" in bb.get_dot_label().lower()
+
+        ret_nodes_cache = dict()
+        def get_ret_nodes(entry, cfg):
+            if entry in ret_nodes_cache:
+                return ret_nodes_cache[entry]
+
+            ret_nodes = list()
+            for addr in cfg.nodes:
+                bb = cfg.nodes[addr]["data"]
+                if is_return(bb):
+                    ret_nodes.append(addr)
+
+            ret_nodes_cache[entry] = ret_nodes
+            return ret_nodes
+
+        def get_ret_addr(cfg_src, callsite):
+            # Just a DUMB function... It finds the fallthrough instruction
+            # without assuming the instrunction length (but it must be < 10)
+            i = 1
+            while i < 10:
+                if callsite + i in cfg_src.nodes:
+                    return callsite + i
+                i += 1
+            return None
+
+        cfgs = dict()
+        for addr in cg.nodes:
+            cfg = add_cfg(addr)
+            cfgs[addr] = cfg
+
+        for addr_src, addr_dst, i in cg.edges:
+            if cfgs[addr_src].size() == 0 or cfgs[addr_dst] == 0:
+                continue
+
+            callsite = cg.edges[addr_src, addr_dst, i]["callsite"]
+            retaddr  = get_ret_addr(cfgs[addr_src], callsite)
+            assert retaddr is not None
+
+            assert callsite in res_g.nodes
+            assert addr_dst in res_g.nodes
+            res_g.add_edge(callsite, addr_dst)
+            for ret_node in get_ret_nodes(addr_dst, cfgs[addr_dst]):
+                assert ret_node in res_g.nodes
+                assert retaddr  in res_g.nodes
+                res_g.add_edge(ret_node, retaddr)
+
+        return normalize_graph(res_g)
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:
