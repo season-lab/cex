@@ -196,7 +196,10 @@ class CEXProject(object):
             assert addr_dst in res_g.nodes
             res_g.add_edge(callsite, addr_dst)
 
-            retaddr  = get_ret_addr(cfgs[addr_src], callsite)
+            # Easy edge
+            retaddr = get_ret_addr(cfgs[addr_src], callsite)
+
+            # HARD ret edges. Best effort
             if retaddr is None:
                 # FIXME: this happens for example with PLT calls between libraries
                 continue
