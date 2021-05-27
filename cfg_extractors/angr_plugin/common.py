@@ -55,7 +55,10 @@ class AngrCfgExtractor(ICfgExtractor):
                     g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name))
 
                 for block_with_call_addr in fun_src.get_call_sites():
-                    callsite = fun_src.get_block(block_with_call_addr).instruction_addrs[-1]
+                    try:
+                        callsite = fun_src.get_block(block_with_call_addr).instruction_addrs[-1]
+                    except:
+                        callsite = block_with_call_addr
                     dst = fun_src.get_call_target(block_with_call_addr)
                     fun_dst = self.data[binary].proj.kb.functions[dst]
                     if dst not in g.nodes:

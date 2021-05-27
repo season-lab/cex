@@ -118,7 +118,7 @@ def merge_cgs(*graphs):
 
     for g in graphs:
         for src_id, dst_id, i in g.edges:
-            callsite = g.edges[src_id, dst_id, i]
+            callsite = g.edges[src_id, dst_id, i]["callsite"]
             res_graph.add_edge(src_id, dst_id, callsite=callsite)
 
     return res_graph
@@ -133,6 +133,14 @@ def fix_graph_addresses(graph, off):
         if hasattr(data, "calls"):
             for i in range(len(data.calls)):
                 data.calls[i] += off
+        if hasattr(data, "insns"):
+            for i in range(len(data.insns)):
+                data.insns[i].addr += off
+
+    for e in graph.edges:
+        if len(e) == 2:
+            break
+        graph.edges[e]["callsite"] += off
     return graph
 
 def to_dot(graph, include_callsites=False):

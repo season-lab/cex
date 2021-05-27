@@ -91,7 +91,7 @@ class CEXProject(object):
             for src in self._lib_dep_graph_edges:
                 dst = self._lib_dep_graph_edges[src]
                 if src in g.nodes and dst in g.nodes:
-                    g.add_edge(src, dst)
+                    g.add_edge(src, dst, callsite=src)
             return g
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
@@ -121,7 +121,7 @@ class CEXProject(object):
 
         return res
 
-    def get_cfg(self, addr=None):
+    def get_cfg(self, addr):
         b = self.get_bin_containing(addr)
         if b is None:
             return None
@@ -187,16 +187,19 @@ class CEXProject(object):
             cfgs[addr] = cfg
 
         for addr_src, addr_dst, i in cg.edges:
-            if cfgs[addr_src].size() == 0 or cfgs[addr_dst] == 0:
+            if len(cfgs[addr_src]) == 0 or len(cfgs[addr_dst]) == 0:
                 continue
 
             callsite = cg.edges[addr_src, addr_dst, i]["callsite"]
-            retaddr  = get_ret_addr(cfgs[addr_src], callsite)
-            assert retaddr is not None
 
             assert callsite in res_g.nodes
             assert addr_dst in res_g.nodes
             res_g.add_edge(callsite, addr_dst)
+
+            retaddr  = get_ret_addr(cfgs[addr_src], callsite)
+            if retaddr is None:
+                # FIXME: this happens for example with PLT calls between libraries
+                continue
             for ret_node in get_ret_nodes(addr_dst, cfgs[addr_dst]):
                 assert ret_node in res_g.nodes
                 assert retaddr  in res_g.nodes
