@@ -1,4 +1,4 @@
-from utils import normalize_graph
+import utils as u
 from yapsy.IPlugin import IPlugin
 
 import os
@@ -113,7 +113,7 @@ class ICfgExtractor(IPlugin):
 
     @staticmethod
     def normalize_graph(graph):
-        return normalize_graph(graph)
+        return u.normalize_graph(graph)
 
     def clear_cache(self):
         return  # Look in subclasses
