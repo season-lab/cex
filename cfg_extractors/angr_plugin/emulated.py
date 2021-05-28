@@ -16,19 +16,29 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     def __init__(self):
         super().__init__()
 
+        self._state_constructors = dict()
         self.multi_cache = dict()
+
+    def set_state_constructor(self, addr, fun: callable):
+        self._state_constructors[addr] = fun
 
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
         proj.hook_symbol("_Znwm", new(), replace=True)
         proj.hook_symbol("_Znwj", new(), replace=True)
 
+        if addr in self._state_constructors:
+            state = self._state_constructors[addr](proj)
+        else:
+            state = None
+
         # We are accurate, but with an incomplete graph
         # NOTE: keep_state=True is necessary, otherwise
         #       SimProcedures are not called
         return proj.analyses.CFGEmulated(
             fail_fast=True, keep_state=True, starts=[addr],
-            context_sensitivity_level=1, call_depth=5)
+            context_sensitivity_level=1, call_depth=5,
+            initial_state=state)
 
     @staticmethod
     def _get_multi_hash(binary: str, libraries: list):
