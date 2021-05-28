@@ -21,6 +21,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
         proj.hook_symbol("_Znwm", new(), replace=True)
+        proj.hook_symbol("_Znwj", new(), replace=True)
 
         # We are accurate, but with an incomplete graph
         # NOTE: keep_state=True is necessary, otherwise
@@ -47,7 +48,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                     binary,
                     main_opts = main_opts,
                     use_system_libs     = False,
-                    auto_load_libs      = True,
+                    auto_load_libs      = False,
                     except_missing_libs = False,
                     use_sim_procedures  = True,
                     force_load_libs     = libraries,
