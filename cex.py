@@ -1,10 +1,10 @@
 import networkx as nx
 import sys
 
-from cfg_extractors import IMultilibCfgExtractor
-from cex_plugin_manager import CexPluginManager
-from utils import merge_cgs, merge_cfgs, fix_graph_addresses, explode_cfg, normalize_graph
-from bininfo import BinInfo
+from .cfg_extractors import IMultilibCfgExtractor
+from .cex_plugin_manager import CexPluginManager
+from .utils import merge_cgs, merge_cfgs, fix_graph_addresses, explode_cfg, normalize_graph
+from .bininfo import BinInfo
 
 def print_err(*msg):
     sys.stderr.write(" ".join(map(str, msg)) + "\n")
