@@ -21,6 +21,21 @@ class AngrCfgExtractor(ICfgExtractor):
 
         self.data = dict()
 
+    @staticmethod
+    def is_arm(proj):
+        return proj.arch.name == "ARMEL"
+
+    @staticmethod
+    def is_thumb(proj, addr):
+        if not AngrCfgExtractor.is_arm(proj):
+            return False
+
+        assert addr % 2 == 0
+
+        s = proj.factory.blank_state()
+        s.ip = addr
+        return s.block().size == 0
+
     def _build_project(self, binary: str):
         if binary not in self.data:
             load_options={'main_opts': {}}
@@ -48,9 +63,21 @@ class AngrCfgExtractor(ICfgExtractor):
         self._build_angr_cfg_cg(binary, entry)
 
         if entry not in self.data[binary].cg:
+
+            orig_entry = entry
+            if AngrCfgExtractor.is_thumb(self.data[binary].proj, entry):
+                entry += 1
+
+            is_arm = False
+            if AngrCfgExtractor.is_arm(self.data[binary].proj):
+                is_arm = True
+
             g = nx.MultiDiGraph()
             for src in self.data[binary].proj.kb.functions:
                 fun_src = self.data[binary].proj.kb.functions[src]
+                if is_arm:
+                    src -= src % 2
+
                 if src not in g.nodes:
                     g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name))
 
@@ -59,23 +86,53 @@ class AngrCfgExtractor(ICfgExtractor):
                         callsite = fun_src.get_block(block_with_call_addr).instruction_addrs[-1]
                     except:
                         callsite = block_with_call_addr
+                    if is_arm:
+                        callsite -= callsite % 2
+
                     dst = fun_src.get_call_target(block_with_call_addr)
                     fun_dst = self.data[binary].proj.kb.functions[dst]
+                    if is_arm:
+                        dst -= dst % 2
+
                     if dst not in g.nodes:
                         g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
 
                     g.add_edge(src, dst, callsite=callsite)
 
-            self.data[binary].cg[entry] = nx.ego_graph(g, entry, radius=sys.maxsize)
+                for block_with_jmp_addr in fun_src.jumpout_sites:
+                    callsite = fun_src.get_block(block_with_jmp_addr.addr).instruction_addrs[-1]
+                    if is_arm:
+                        callsite -= callsite % 2
+
+                    for b_dst in block_with_jmp_addr.successors():
+                        dst = b_dst.addr
+                        fun_dst = self.data[binary].proj.kb.functions[dst]
+                        if is_arm:
+                            dst -= dst % 2
+
+                        if dst not in g.nodes:
+                            g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
+
+                        g.add_edge(src, dst, callsite=callsite)
+
+            self.data[binary].cg[entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
 
     def _build_cfg(self, binary, addr):
         self._build_angr_cfg_cg(binary, addr)
 
-        if addr not in self.data[binary].proj.kb.functions:
+        addr_angr = addr
+        if addr % 2 == 0 and AngrCfgExtractor.is_thumb(self.data[binary].proj, addr):
+            addr_angr += 1
+
+        if addr_angr not in self.data[binary].proj.kb.functions:
             raise FunctionNotFoundException(addr)
 
         if addr not in self.data[binary].cfg:
-            fun = self.data[binary].proj.kb.functions[addr]
+            is_arm = False
+            if AngrCfgExtractor.is_arm(self.data[binary].proj):
+                is_arm = True
+
+            fun = self.data[binary].proj.kb.functions[addr_angr]
             g   = nx.DiGraph()
 
             # fun_cfg   = to_supergraph(fun.transition_graph_ex(exception_edges=True))
@@ -98,8 +155,12 @@ class AngrCfgExtractor(ICfgExtractor):
                 if len(calls) > 0:
                     insns[-1].call_refs = calls
 
-                g.add_node(node.addr, data=CFGNodeData(
-                    addr=node.addr,
+                addr = node.addr
+                if is_arm:
+                    addr -= addr % 2
+
+                g.add_node(addr, data=CFGNodeData(
+                    addr=addr,
                     insns=insns,
                     calls=calls))
 
@@ -108,7 +169,13 @@ class AngrCfgExtractor(ICfgExtractor):
                     add_node(block_src)
                 if block_dst.addr not in g.nodes:
                     add_node(block_dst)
-                g.add_edge(block_src.addr, block_dst.addr)
+
+                src_addr = block_src.addr
+                dst_addr = block_dst.addr
+                if is_arm:
+                    src_addr -= src_addr % 2
+                    dst_addr -= dst_addr % 2
+                g.add_edge(src_addr, dst_addr)
 
             self.data[binary].cfg[addr] = g
 

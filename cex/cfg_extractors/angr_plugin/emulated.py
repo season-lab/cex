@@ -31,6 +31,9 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         proj.hook_symbol("_Znwm", new(), replace=True)
         proj.hook_symbol("_Znwj", new(), replace=True)
 
+        if addr % 2 == 0 and AngrCfgExtractor.is_thumb(proj, addr):
+            addr += 1
+
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
         else:
@@ -88,22 +91,61 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         if h in self.multi_cache and entry in self.multi_cache[h].cg:
             return self.multi_cache[h].cg[entry]
 
+        orig_entry = entry
+        if AngrCfgExtractor.is_thumb(proj, entry):
+            entry += 1
+
+        is_arm = False
+        if AngrCfgExtractor.is_arm(proj):
+            is_arm = True
+
         self._get_angr_cfg(proj, entry)
 
         g = nx.MultiDiGraph()
         for src in proj.kb.functions:
             fun_src = proj.kb.functions[src]
+            if is_arm:
+                src -= src % 2
+
             if src not in g.nodes:
                 g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name))
 
             for block_with_call_addr in fun_src.get_call_sites():
                 callsite = fun_src.get_block(block_with_call_addr).instruction_addrs[-1]
+                if is_arm:
+                    callsite -= callsite % 2
+
                 dst = fun_src.get_call_target(block_with_call_addr)
                 fun_dst = proj.kb.functions[dst]
+                if fun_dst.is_simprocedure:
+                    continue
+
+                if is_arm:
+                    dst -= dst % 2
+
                 if dst not in g.nodes:
                     g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
 
                 g.add_edge(src, dst, callsite=callsite)
 
-        self.multi_cache[h].cg[entry] = nx.ego_graph(g, entry, radius=sys.maxsize)
+            for block_with_jmp_addr in fun_src.jumpout_sites:
+                callsite = fun_src.get_block(block_with_jmp_addr.addr).instruction_addrs[-1]
+                if is_arm:
+                    callsite -= callsite % 2
+
+                for b_dst in block_with_jmp_addr.successors():
+                    dst = b_dst.addr
+                    fun_dst = proj.kb.functions[dst]
+                    if fun_dst.is_simprocedure:
+                        continue
+
+                    if is_arm:
+                        dst -= dst % 2
+
+                    if dst not in g.nodes:
+                        g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
+
+                    g.add_edge(src, dst, callsite=callsite)
+
+        self.multi_cache[h].cg[entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
         return self.multi_cache[h].cg[entry]

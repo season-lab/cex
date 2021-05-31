@@ -16,8 +16,8 @@ class CEXProject(object):
 
     def __init__(self, main_binary: str, libs: list=None, plugins: list=None):
         self.plugins = list(map(lambda p: CEXProject.pm.get_plugin_by_name(p), plugins or [CEXProject.default_plugin]))
-        self.multilib_plugins     = list(filter(lambda p: isinstance(p, IMultilibCfgExtractor), self.plugins))
-        self.non_multilib_plugins = list(filter(lambda p: not isinstance(p, IMultilibCfgExtractor), self.plugins))
+        self.multilib_plugins     = list(filter(lambda p: hasattr(p, "get_multi_callgraph"), self.plugins))
+        self.non_multilib_plugins = list(filter(lambda p: not hasattr(p, "get_multi_callgraph"), self.plugins))
 
         self.bin  = BinInfo(main_binary, 0x400000)
         self.libs = list()
