@@ -22,6 +22,10 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     def set_state_constructor(self, addr, fun: callable):
         self._state_constructors[addr] = fun
 
+    def del_state_constructor(self, addr):
+        if addr in self._state_constructors:
+            del self._state_constructors
+
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
         proj.hook_symbol("_Znwm", new(), replace=True)
