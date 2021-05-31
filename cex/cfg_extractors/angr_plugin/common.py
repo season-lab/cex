@@ -150,7 +150,10 @@ class AngrCfgExtractor(ICfgExtractor):
                 insns = list()
                 for insn in fun.get_block(node.addr, node.size).capstone.insns:
                     mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
-                    insns.append(CFGInstruction(addr=insn.insn.address, call_refs=list(), mnemonic=mnemonic))
+                    addr = insn.insn.address
+                    if is_arm:
+                        addr -= addr % 2
+                    insns.append(CFGInstruction(addr=addr, call_refs=list(), mnemonic=mnemonic))
 
                 if len(calls) > 0:
                     insns[-1].call_refs = calls
