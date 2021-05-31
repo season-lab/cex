@@ -77,13 +77,15 @@ class CEXProject(object):
             libs = set()
             for n_id in g.nodes:
                 binfo = self.get_bin_containing(n_id)
-                assert binfo is not None
+                if binfo is None:
+                    continue
                 libs.add(binfo)
 
                 if n_id in self._lib_dep_graph_edges:
                     dst_addr = self._lib_dep_graph_edges[n_id]
                     binfo = self.get_bin_containing(dst_addr)
-                    assert binfo is not None
+                    if binfo is None:
+                        continue
                     libs.add(binfo)
             return libs
 
@@ -142,6 +144,7 @@ class CEXProject(object):
         res_g = nx.DiGraph()
         def add_cfg(addr):
             cfg = self.get_cfg(addr)
+            cfg = cfg or nx.DiGraph()
             cfg = explode_cfg(cfg)
 
             for addr in cfg.nodes:
