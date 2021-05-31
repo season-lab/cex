@@ -1,4 +1,4 @@
-from cfg_extractors.angr_plugin.common import AngrCfgExtractor
+from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor
 
 class AngrCfgExtractorFast(AngrCfgExtractor):
     def _get_angr_cfg(self, proj, addr):

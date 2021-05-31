@@ -1,7 +1,6 @@
 import networkx as nx
 
 from collections import defaultdict
-import cfg_extractors as ce
 
 def explode_cfg(g):
     res_g = nx.DiGraph()
@@ -53,7 +52,7 @@ def normalize_graph(graph, merge_calls=False):
                 break
 
             assert predecessors[0] == n_id
-            if not merge_calls and isinstance(node_data, ce.CFGNodeData) and \
+            if not merge_calls and hasattr(node_data, "insns") and \
                     len(node_data.insns[-1].call_refs) > 0:
                 break
 

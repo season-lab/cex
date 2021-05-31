@@ -1,7 +1,7 @@
 import rzpipe
 import os
 
-from cfg_extractors.utils import get_md5_file
+from .cfg_extractors.utils import get_md5_file
 from collections import namedtuple
 
 FunctionDescription = namedtuple("FunctionDescription", ["name", "offset", "is_exported"])

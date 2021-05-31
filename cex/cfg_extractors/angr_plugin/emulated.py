@@ -3,8 +3,8 @@ import angr
 import sys
 import os
 
-from cfg_extractors.angr_plugin.common import AngrCfgExtractor, AngrBinaryData, check_pie
-from cfg_extractors import IMultilibCfgExtractor, CGNodeData
+from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor, AngrBinaryData, check_pie
+from cex.cfg_extractors import IMultilibCfgExtractor, CGNodeData
 
 
 class new(angr.SimProcedure):

@@ -5,13 +5,9 @@ import argparse
 import sys
 import os
 
-try:
-    from cex import CEXProject
-    from utils import to_dot, to_json
-except:
-    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    from cex import CEXProject
-    from utils import to_dot, to_json
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from cex import CEXProject
+from cex.utils import to_dot, to_json
 
 def get_plugins():
     return "Plugins: " + " ".join(CEXProject.pm.get_plugin_names())

@@ -4,8 +4,8 @@ import json
 import subprocess
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
-from cfg_extractors.utils import check_pie, get_md5_file
+from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
+from cex.cfg_extractors.utils import check_pie, get_md5_file
 
 
 class GhidraBinaryData(object):

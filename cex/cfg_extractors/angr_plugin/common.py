@@ -2,9 +2,9 @@ import sys
 import angr
 import networkx as nx
 
-from cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, FunctionNotFoundException
-from cfg_extractors.angr_plugin.graph_utils import to_supergraph
-from cfg_extractors.utils import check_pie
+from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, FunctionNotFoundException
+from cex.cfg_extractors.angr_plugin.graph_utils import to_supergraph
+from cex.cfg_extractors.utils import check_pie
 
 
 class AngrBinaryData(object):
