@@ -1,3 +1,5 @@
+import sys
+
 from cex.utils import normalize_graph
 from yapsy.IPlugin import IPlugin
 
