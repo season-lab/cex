@@ -38,7 +38,11 @@ class AngrCfgExtractor(ICfgExtractor):
         if s.block().size == 0:
             return True
 
-        # Heuristic 2: check symbols
+        # Heuristic 2: check number of instructions with capstone
+        if len(s.block().capstone.insns) == 0:
+            return True
+
+        # Heuristic 3: check symbols
         for s in proj.loader.symbols:
             if s.rebased_addr == addr + 1:
                 return True
