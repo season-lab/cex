@@ -32,9 +32,20 @@ class AngrCfgExtractor(ICfgExtractor):
 
         assert addr % 2 == 0
 
+        # Heuristic 1: check if the lifted block is empty
         s = proj.factory.blank_state()
         s.ip = addr
-        return s.block().size == 0
+        if s.block().size == 0:
+            return True
+
+        # Heuristic 2: check symbols
+        for s in proj.loader.symbols:
+            if s.rebased_addr == addr + 1:
+                return True
+            elif s.rebased_addr == addr:
+                return False
+
+        return False
 
     def _build_project(self, binary: str):
         if binary not in self.data:
