@@ -128,7 +128,7 @@ class AngrCfgExtractor(ICfgExtractor):
 
                         g.add_edge(src, dst, callsite=callsite)
 
-            self.data[binary].cg[entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
+            self.data[binary].cg[orig_entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
 
     def _build_cfg(self, binary, addr):
         self._build_angr_cfg_cg(binary, addr)
