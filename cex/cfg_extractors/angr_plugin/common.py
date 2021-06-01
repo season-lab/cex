@@ -145,6 +145,8 @@ class AngrCfgExtractor(ICfgExtractor):
             def add_node(node):
                 calls = list()
                 n     = fun.get_node(node.addr)
+                if n is None:
+                    return
                 for el in n.successors():
                     if el.__class__.__name__ == "Function":
                         calls.append(el.addr)
@@ -169,17 +171,18 @@ class AngrCfgExtractor(ICfgExtractor):
                     insns=insns,
                     calls=calls))
 
-            for block_src, block_dst in fun.graph.edges:
-                if block_src.addr not in g.nodes:
-                    add_node(block_src)
-                if block_dst.addr not in g.nodes:
-                    add_node(block_dst)
+            for node in fun.graph.nodes:
+                add_node(node)
 
+            for block_src, block_dst in fun.graph.edges:
                 src_addr = block_src.addr
                 dst_addr = block_dst.addr
                 if is_arm:
                     src_addr -= src_addr % 2
                     dst_addr -= dst_addr % 2
+
+                if src_addr not in g.nodes or dst_addr not in g.nodes:
+                    continue
                 g.add_edge(src_addr, dst_addr)
 
             self.data[binary].cfg[addr] = g
