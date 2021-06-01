@@ -31,13 +31,13 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         proj.hook_symbol("_Znwm", new(), replace=True)
         proj.hook_symbol("_Znwj", new(), replace=True)
 
-        if addr % 2 == 0 and AngrCfgExtractor.is_thumb(proj, addr):
-            addr += 1
-
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
         else:
             state = None
+
+        if addr % 2 == 0 and AngrCfgExtractor.is_thumb(proj, addr):
+            addr += 1
 
         # We are accurate, but with an incomplete graph
         # NOTE: keep_state=True is necessary, otherwise
