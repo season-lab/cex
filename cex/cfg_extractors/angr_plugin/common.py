@@ -54,7 +54,9 @@ class AngrCfgExtractor(ICfgExtractor):
     def _build_angr_cfg_cg(self, binary, addr):
         self._build_project(binary)
 
-        if addr not in self.data[binary].processed:
+        if addr not in self.data[binary].processed or \
+            addr not in self.data[binary].proj.kb.functions:
+
             # I trust proj.kb
             self._get_angr_cfg(self.data[binary].proj, addr)
             self.data[binary].processed.add(addr)
