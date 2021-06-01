@@ -163,7 +163,11 @@ class AngrCfgExtractor(ICfgExtractor):
                         calls.append(el.addr)
 
                 insns = list()
-                for insn in fun.get_block(node.addr, node.size).capstone.insns:
+                try:
+                    capstone_insns = fun.get_block(node.addr, node.size).capstone.insns
+                except KeyError:
+                    return
+                for insn in capstone_insns:
                     mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
                     addr = insn.insn.address
                     if is_arm:
