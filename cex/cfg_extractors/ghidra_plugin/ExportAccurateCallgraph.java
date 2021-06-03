@@ -16,6 +16,23 @@ import java.util.HashSet;
 
 public class ExportAccurateCallgraph extends HeadlessScript {
 
+	private boolean createIfMissing(Address addr) throws Exception {
+		Function f = getFunctionAt(addr);
+		if (f != null)
+			return true;
+
+		f = createFunction(addr, null);
+		if (f == null)
+			// Weird, but works
+			f = createFunction(addr, null);
+
+		if (f == null)
+			return false;
+
+		printf("Successfully created function @ %s\n", addr.toString());
+		return true;
+	}
+
 	public void run() throws Exception {
 
 		// Get the output file from the command line argument
@@ -83,6 +100,14 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 					Address target = op.getInput(0).getAddress();
 					if (external_functions.contains(target.getOffset()))
 						continue;
+
+					// Create target function if not exists (rare, but sometimes Ghidra
+					// defines the target function as a subroutine instead of function)
+					if (!createIfMissing(target)) {
+						// Unable to create the function... Exclude this edge and be conservative
+						printf("Unable to create function @ %s\n", target.toString());
+						continue;
+					}
 
 					if (need_comma)
 						pout.format(",\n");

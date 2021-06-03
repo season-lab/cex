@@ -194,8 +194,11 @@ class CEXProject(object):
                 continue
 
             callsite = cg.edges[addr_src, addr_dst, i]["callsite"]
+            if callsite not in res_g.nodes:
+                # The callsite in not among the instructions of the CFG. Skip the edge
+                # Most probably an inaccuracy of the original CFG (I debugged a case in angr)
+                continue
 
-            assert callsite in res_g.nodes
             assert addr_dst in res_g.nodes
             res_g.add_edge(callsite, addr_dst)
 

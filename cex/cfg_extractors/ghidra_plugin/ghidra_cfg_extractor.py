@@ -315,7 +315,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 break
 
         if target_fun is None:
-            return None
+            return nx.DiGraph()
 
         cfg = nx.DiGraph()
         for block_raw in target_fun["blocks"]:
