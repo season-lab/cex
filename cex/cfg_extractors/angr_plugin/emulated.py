@@ -24,7 +24,11 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
     def del_state_constructor(self, addr):
         if addr in self._state_constructors:
-            del self._state_constructors
+            del self._state_constructors[addr]
+
+            # Invalidate caches (we want to rebuild projects)
+            self.multi_cache = dict()
+            self.data        = dict()
 
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
