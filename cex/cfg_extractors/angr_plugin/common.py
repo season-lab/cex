@@ -69,8 +69,12 @@ class AngrCfgExtractor(ICfgExtractor):
     def _build_angr_cfg_cg(self, binary, addr):
         self._build_project(binary)
 
+        addr_angr = addr
+        if addr % 2 == 0 and AngrCfgExtractor.is_thumb(self.data[binary].proj, addr):
+            addr_angr += 1
+
         if addr not in self.data[binary].processed or \
-            addr not in self.data[binary].proj.kb.functions:
+            addr_angr not in self.data[binary].proj.kb.functions:
 
             # I trust proj.kb
             self._get_angr_cfg(self.data[binary].proj, addr)
