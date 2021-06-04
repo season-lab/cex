@@ -82,6 +82,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 cg=dict(),
                 cfg=dict())
 
+            AngrCfgExtractor._hook_models(self.multi_cache[h].proj)
+
         return self.multi_cache[h].proj
 
     def get_multi_callgraph(self, binary, libraries=None, entry=None, addresses=None):

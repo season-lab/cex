@@ -6,6 +6,9 @@ from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtr
 from cex.cfg_extractors.angr_plugin.graph_utils import to_supergraph
 from cex.cfg_extractors.utils import check_pie
 
+class DummyEmptyModel(angr.SimProcedure):
+    def run(self, *args):
+        return None
 
 class AngrBinaryData(object):
     def __init__(self, proj, processed, cg, cfg):
@@ -51,6 +54,14 @@ class AngrCfgExtractor(ICfgExtractor):
 
         return False
 
+    @staticmethod
+    def _hook_models(proj):
+        # Just an hack to avoid crashes
+        symbols = set(map(lambda s: s.name, proj.loader.symbols))
+
+        if "pow" in symbols:    proj.hook_symbol("pow", DummyEmptyModel(), replace=True)
+        if "roundf" in symbols: proj.hook_symbol("roundf", DummyEmptyModel(), replace=True)
+
     def _build_project(self, binary: str):
         if binary not in self.data:
             load_options={'main_opts': {}}
@@ -61,6 +72,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 processed=set(),
                 cg=dict(),
                 cfg=dict())
+            AngrCfgExtractor._hook_models(self.data[binary].proj)
 
     def _get_angr_cfg(self, proj, addr):
         # Look in subclasses
@@ -111,6 +123,8 @@ class AngrCfgExtractor(ICfgExtractor):
                         callsite -= callsite % 2
 
                     dst = fun_src.get_call_target(block_with_call_addr)
+                    if dst not in self.data[binary].proj.kb.functions:
+                        continue
                     fun_dst = self.data[binary].proj.kb.functions[dst]
                     if is_arm:
                         dst -= dst % 2
@@ -127,6 +141,8 @@ class AngrCfgExtractor(ICfgExtractor):
 
                     for b_dst in block_with_jmp_addr.successors():
                         dst = b_dst.addr
+                        if dst not in self.data[binary].proj.kb.functions:
+                            continue
                         fun_dst = self.data[binary].proj.kb.functions[dst]
                         if is_arm:
                             dst -= dst % 2

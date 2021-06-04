@@ -114,13 +114,14 @@ class CEXProject(object):
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
-            if addr is not None:
-                res = nx.ego_graph(res, addr, radius=sys.maxsize)
 
             for lib in get_involved_libs(res):
                 if lib not in processed:
                     stack.append(lib)
 
+        res = add_depgraph_edges(res)
+        if addr is not None:
+            res = nx.ego_graph(res, addr, radius=sys.maxsize)
         return res
 
     def get_cfg(self, addr):
@@ -138,7 +139,7 @@ class CEXProject(object):
         merged = self._fix_addresses(merged, b)
         return merged
 
-    def get_icfg(self, entry=None):
+    def get_icfg(self, entry):
         cg = self.get_callgraph(entry)
 
         res_g = nx.DiGraph()
@@ -214,7 +215,8 @@ class CEXProject(object):
                 assert retaddr  in res_g.nodes
                 res_g.add_edge(ret_node, retaddr)
 
-        return normalize_graph(res_g)
+        g = normalize_graph(res_g)
+        return nx.ego_graph(g, entry, radius=sys.maxsize)
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:

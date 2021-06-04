@@ -124,7 +124,7 @@ def merge_cgs(*graphs):
 
 def fix_graph_addresses(graph, off):
     mapping = lambda a : a + off
-    graph = nx.relabel_nodes(graph, mapping, copy=False)
+    graph = nx.relabel_nodes(graph, mapping, copy=True)
     for n_id in graph.nodes:
         n = graph.nodes[n_id]
         data = n["data"]
