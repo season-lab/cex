@@ -82,7 +82,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 cg=dict(),
                 cfg=dict())
 
-            AngrCfgExtractor._hook_models(self.multi_cache[h].proj)
+            AngrCfgExtractor._hook_fp_models(self.multi_cache[h].proj)
 
         return self.multi_cache[h].proj
 

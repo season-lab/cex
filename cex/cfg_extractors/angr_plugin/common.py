@@ -55,12 +55,24 @@ class AngrCfgExtractor(ICfgExtractor):
         return False
 
     @staticmethod
-    def _hook_models(proj):
+    def _hook_fp_models(proj):
         # Just an hack to avoid crashes
-        symbols = set(map(lambda s: s.name, proj.loader.symbols))
+        def hook_with_dummy(name):
+            proj.hook_symbol(name, DummyEmptyModel(), replace=True)
 
-        if "pow" in symbols:    proj.hook_symbol("pow", DummyEmptyModel(), replace=True)
-        if "roundf" in symbols: proj.hook_symbol("roundf", DummyEmptyModel(), replace=True)
+        float_functions = set()
+        for s in proj.loader.symbols:
+            if proj.is_hooked(s.rebased_addr):
+                h = proj.hooked_by(s.rebased_addr)
+                fun_ty = h.cc.func_ty
+                if fun_ty is None:
+                    continue
+                if "double" in fun_ty.returnty.name or "float" in fun_ty.returnty.name:
+                    float_functions.add(h.display_name)
+
+        to_hook = float_functions
+        for n in to_hook:
+            hook_with_dummy(n)
 
     def _build_project(self, binary: str):
         if binary not in self.data:
@@ -72,7 +84,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 processed=set(),
                 cg=dict(),
                 cfg=dict())
-            AngrCfgExtractor._hook_models(self.data[binary].proj)
+            AngrCfgExtractor._hook_fp_models(self.data[binary].proj)
 
     def _get_angr_cfg(self, proj, addr):
         # Look in subclasses
