@@ -141,6 +141,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
                 for b_dst in block_with_jmp_addr.successors():
                     dst = b_dst.addr
+                    if dst not in proj.kb.functions:
+                        continue
                     fun_dst = proj.kb.functions[dst]
                     if fun_dst.is_simprocedure:
                         continue

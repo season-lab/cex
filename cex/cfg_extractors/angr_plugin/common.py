@@ -210,6 +210,8 @@ class AngrCfgExtractor(ICfgExtractor):
                         addr -= addr % 2
                     insns.append(CFGInstruction(addr=addr, call_refs=list(), mnemonic=mnemonic))
 
+                if len(insns) == 0:
+                    return
                 if len(calls) > 0:
                     insns[-1].call_refs = calls
 
