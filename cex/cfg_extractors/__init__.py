@@ -124,3 +124,6 @@ class ICfgExtractor(IPlugin):
 class IMultilibCfgExtractor(object):
     def get_multi_callgraph(self, binary, libraries=None, entry=None, addresses=None):
         raise NotImplementedError
+
+    def get_icfg(self, binary, libraries=None, entry=None, addresses=None):
+        raise NotImplementedError

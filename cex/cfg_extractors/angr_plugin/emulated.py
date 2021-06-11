@@ -3,9 +3,15 @@ import angr
 import sys
 import os
 
-from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor, AngrBinaryData, check_pie
-from cex.cfg_extractors import IMultilibCfgExtractor, CGNodeData
+from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor
+from cex.cfg_extractors import IMultilibCfgExtractor, CGNodeData, CFGInstruction, CFGNodeData
 
+class AngrEmuBinaryData(object):
+    def __init__(self, proj, cg, icfg_raw, icfg):
+        self.proj      = proj
+        self.cg        = cg
+        self.icfg_raw  = icfg_raw
+        self.icfg      = icfg
 
 class new(angr.SimProcedure):
     def run(self, sim_size):
@@ -76,11 +82,11 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                     lib_opts            = lib_opts
                 )
 
-            self.multi_cache[h] = AngrBinaryData(
+            self.multi_cache[h] = AngrEmuBinaryData(
                 proj=proj,
-                processed=set(),
                 cg=dict(),
-                cfg=dict())
+                icfg_raw=dict(),
+                icfg=dict())
 
             AngrCfgExtractor._hook_fp_models(self.multi_cache[h].proj)
 
@@ -105,7 +111,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         if AngrCfgExtractor.is_arm(proj):
             is_arm = True
 
-        self._get_angr_cfg(proj, entry)
+        icfg_raw = self._get_angr_cfg(proj, entry)
 
         g = nx.MultiDiGraph()
         for src in proj.kb.functions:
@@ -156,4 +162,70 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                     g.add_edge(src, dst, callsite=callsite)
 
         self.multi_cache[h].cg[entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
+        self.multi_cache[h].icfg_raw[entry] = icfg_raw
         return self.multi_cache[h].cg[entry]
+
+    def get_icfg(self, binary, libraries=None, entry=None, addresses=None):
+        h     = AngrCfgExtractorEmulated._get_multi_hash(binary, libraries)
+        proj  = self._build_multi_project(binary, libraries, addresses)
+        entry = entry or proj.entry
+
+        if entry in self.multi_cache[h].icfg:
+            return self.multi_cache[h].icfg[entry]
+
+        if entry not in self.multi_cache[h].icfg_raw:
+            self.get_multi_callgraph(binary, libraries, entry, addresses)
+
+        cfg = self.multi_cache[h].icfg_raw[entry]
+
+        g = nx.DiGraph()
+        is_arm = False
+        if AngrCfgExtractor.is_arm(proj):
+            is_arm = True
+
+        def add_node(node):
+            calls = list()
+            insns = list()
+            if node.block is None:
+                return
+
+            capstone_insns = node.block.capstone.insns
+            for insn in capstone_insns:
+                mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
+                addr = insn.insn.address
+                if is_arm:
+                    addr -= addr % 2
+                insns.append(CFGInstruction(addr=addr, call_refs=list(), mnemonic=mnemonic))
+
+            if len(insns) == 0:
+                return
+            if len(calls) > 0:
+                insns[-1].call_refs = calls
+
+            addr = node.addr
+            if is_arm:
+                addr -= addr % 2
+
+            g.add_node(addr, data=CFGNodeData(
+                addr=addr,
+                insns=insns,
+                calls=calls))
+
+        for node in cfg.graph.nodes:
+            add_node(node)
+
+        for block_src, block_dst in cfg.graph.edges:
+            src_addr = block_src.addr
+            dst_addr = block_dst.addr
+            if is_arm:
+                src_addr -= src_addr % 2
+                dst_addr -= dst_addr % 2
+
+            if src_addr not in g.nodes or dst_addr not in g.nodes:
+                continue
+            g.add_edge(src_addr, dst_addr)
+
+        g = nx.ego_graph(g, entry, radius=sys.maxsize)
+        self.multi_cache[h].icfg[entry] = g
+
+        return g

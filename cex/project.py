@@ -62,6 +62,7 @@ class CEXProject(object):
         b = self.bin if addr is None else self.get_bin_containing(addr)
         if b is None:
             return None
+        other_paths = list(map(lambda l: l.path, filter(lambda bb: bb.hash != b.hash, [self.bin] + self.libs)))
 
         if len([self.bin] + self.libs) == 1:
             graphs = list(map(lambda p: p.get_callgraph(b.path, addr), self.plugins))
@@ -97,7 +98,7 @@ class CEXProject(object):
             return g
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
-            b.path, self._libs_paths, addr, self._addresses), self.multilib_plugins))
+            b.path, other_paths, addr, self._addresses), self.multilib_plugins))
         res = merge_cgs(*graphs)
 
         processed = set()
@@ -124,7 +125,7 @@ class CEXProject(object):
             res = nx.ego_graph(res, addr, radius=sys.maxsize)
         return res
 
-    def get_cfg(self, addr):
+    def get_cfg(self, addr, no_multilib=False):
         b = self.get_bin_containing(addr)
         if b is None:
             return None
@@ -132,19 +133,19 @@ class CEXProject(object):
         if addr is not None:
             addr = addr - b.addr + 0x400000
 
-        graphs = list(map(lambda p: p.get_cfg(b.path, addr), self.plugins))
+        graphs = list(map(lambda p: p.get_cfg(b.path, addr), self.non_multilib_plugins if no_multilib else self.plugins))
         merged = merge_cfgs(*graphs)
         if merged is None:
             return None
         merged = self._fix_addresses(merged, b)
         return merged
 
-    def get_icfg(self, entry):
+    def get_icfg(self, entry, use_multilib_icfg=True):
         cg = self.get_callgraph(entry)
 
         res_g = nx.DiGraph()
         def add_cfg(addr):
-            cfg = self.get_cfg(addr)
+            cfg = self.get_cfg(addr, no_multilib=use_multilib_icfg)
             cfg = cfg or nx.DiGraph()
             cfg = explode_cfg(cfg)
 
@@ -214,6 +215,15 @@ class CEXProject(object):
                 assert ret_node in res_g.nodes
                 assert retaddr  in res_g.nodes
                 res_g.add_edge(ret_node, retaddr)
+
+        if use_multilib_icfg:
+            # Dont reconstruct the CFG of every single function, but use the
+            # ICFG at entrypoint. This is more scalable but less precise
+            b = self.bin if addr is None else self.get_bin_containing(addr)
+            other_paths = list(map(lambda l: l.path, filter(lambda bb: bb.hash != b.hash, [self.bin] + self.libs)))
+            if b is not None:
+                graphs = list(map(lambda p: p.get_icfg(b.path, other_paths, entry, self._addresses), self.multilib_plugins))
+                res_g  = merge_cfgs(res_g, *graphs)
 
         g = normalize_graph(res_g)
         return nx.ego_graph(g, entry, radius=sys.maxsize)
