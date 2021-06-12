@@ -174,7 +174,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             return self.multi_cache[h].icfg[entry]
 
         if entry not in self.multi_cache[h].icfg_raw:
-            self.get_multi_callgraph(binary, libraries, entry, addresses)
+            self.multi_cache[h].icfg_raw[entry] = self._get_angr_cfg(proj, entry)
 
         cfg = self.multi_cache[h].icfg_raw[entry]
 
