@@ -62,8 +62,6 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         return tuple([binary] + sorted(libraries))
 
     def _build_multi_project(self, binary: str, libraries: list, addresses: dict):
-        assert len(libraries) > 0
-
         h = AngrCfgExtractorEmulated._get_multi_hash(binary, libraries)
         if h not in self.multi_cache:
             main_opts = { 'base_addr' : addresses[binary] }
@@ -166,6 +164,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         return self.multi_cache[h].cg[entry]
 
     def get_icfg(self, binary, libraries=None, entry=None, addresses=None):
+        libraries = libraries or list()
+
         h     = AngrCfgExtractorEmulated._get_multi_hash(binary, libraries)
         proj  = self._build_multi_project(binary, libraries, addresses)
         entry = entry or proj.entry
