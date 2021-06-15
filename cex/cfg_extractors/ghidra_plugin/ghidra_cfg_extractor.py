@@ -267,9 +267,35 @@ class GhidraCfgExtractor(ICfgExtractor):
         if os.path.exists(cfg_json_path):
             os.remove(cfg_json_path)
 
+    def _load_defined_functions(self, binary):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        binary_md5         = get_md5_file(binary)
+        defined_cache_name = "ghidra_defined_functions_" + binary_md5  + ".txt"
+        defined_cache_path = os.path.join(self.get_tmp_folder(), defined_cache_name)
+        if os.path.exists(defined_cache_path):
+            with open(defined_cache_path, "r") as fin:
+                for line in fin:
+                    line = int(line.strip(), 16)
+                    self.data[binary].defined_functions.add(line)
+
+    def _cache_defined_functions(self, binary):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        binary_md5         = get_md5_file(binary)
+        defined_cache_name = "ghidra_defined_functions_" + binary_md5  + ".txt"
+        defined_cache_path = os.path.join(self.get_tmp_folder(), defined_cache_name)
+        with open(defined_cache_path, "w") as fout:
+            for off in self.data[binary].defined_functions:
+                fout.write("%#x\n" % off)
+
     def define_functions(self, binary, offsets):
         if binary not in self.data:
             self.data[binary] = GhidraBinaryData()
+
+        self._load_defined_functions(binary)
 
         all_defined = True
         for off in offsets:
@@ -280,6 +306,7 @@ class GhidraCfgExtractor(ICfgExtractor):
 
         for off in offsets:
             self.data[binary].defined_functions.add(off)
+        self._cache_defined_functions(binary)
 
         infile = "/dev/shm/offsets.txt"
         with open(infile, "w") as fout:
