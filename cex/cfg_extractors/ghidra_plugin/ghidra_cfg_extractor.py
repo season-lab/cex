@@ -14,6 +14,7 @@ class GhidraBinaryData(object):
         self.cg_raw  = cg_raw
         self.cg      = cg
         self.acc_cg  = acc_cg
+        self.defined_functions = set()
 
 
 class GhidraCfgExtractor(ICfgExtractor):
@@ -57,6 +58,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
+        "-noanalysis",
         "-import",
         "$BINARY",
         "-postScript",
@@ -69,6 +71,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
+        "-noanalysis",
         "-import",
         "$BINARY",
         "-postScript",
@@ -94,6 +97,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
+        "-noanalysis",
         "-import",
         "$BINARY",
         "-postScript",
@@ -118,6 +122,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         return "GHIDRA_HOME" in os.environ
 
     def get_project_path(self, binary):
+        # This will trigger the autoanalysis!
         binary_md5 = get_md5_file(binary)
         proj_name  = "ghidra_proj_" + binary_md5  + ".gpr"
         proj_path  = os.path.join(self.get_tmp_folder(), proj_name)
@@ -242,16 +247,56 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             self.data[binary].cg_raw = cg_raw
 
+    def clear_cg_cfg_cache_for_binary(self, binary):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        self.data[binary].cfg_raw = None
+        self.data[binary].cg_raw  = None
+        self.data[binary].cg      = None
+        self.data[binary].acc_cg  = None
+
+        binary_md5    = get_md5_file(binary)
+        cg_json_name  = "ghidra_cg_" + binary_md5  + ".json"
+        cg_json_path  = os.path.join(self.get_tmp_folder(), cg_json_name)
+        cfg_json_name = "ghidra_cfg_" + binary_md5  + ".json"
+        cfg_json_path = os.path.join(self.get_tmp_folder(), cfg_json_name)
+
+        if os.path.exists(cg_json_path):
+            os.remove(cg_json_path)
+        if os.path.exists(cfg_json_path):
+            os.remove(cfg_json_path)
+
     def define_functions(self, binary, offsets):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        all_defined = True
+        for off in offsets:
+            if off not in self.data[binary].defined_functions:
+                all_defined = False
+        if all_defined:
+            return False
+
+        for off in offsets:
+            self.data[binary].defined_functions.add(off)
+
         infile = "/dev/shm/offsets.txt"
         with open(infile, "w") as fout:
             for off in offsets:
                 fout.write("%#x\n" % off)
 
         cmd = self._get_cmd_custom_functions(binary, infile)
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+
+        if b"[OUTPUT_MSG] OK" in out:
+            self.clear_cg_cfg_cache_for_binary(binary)
+            return True
+        return False
 
     def get_cfg_callgraph(self, binary, entry=None):
+        if entry is not None:
+            self.define_functions(binary, [entry])
         self._load_cfg_raw(binary)
 
         if self.data[binary].cg is None:
@@ -279,6 +324,8 @@ class GhidraCfgExtractor(ICfgExtractor):
         return self.data[binary].cg
 
     def get_accurate_callgraph(self, binary, entry=None):
+        if entry is not None:
+            self.define_functions(binary, [entry])
         self._load_accurate_cg_raw(binary)
 
         if self.data[binary].acc_cg is None:

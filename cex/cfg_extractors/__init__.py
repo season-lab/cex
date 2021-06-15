@@ -113,6 +113,12 @@ class ICfgExtractor(IPlugin):
     def get_tmp_folder(self):
         return "/dev/shm/cex_projects"
 
+    def define_functions(self, binary, addresses):
+        # Look also in subclasses
+        # This function should notify the plugin that a new functions has been discovered.
+        # If this function is new for the plugin, the function should return True.
+        return False
+
     @staticmethod
     def normalize_graph(graph):
         return normalize_graph(graph)

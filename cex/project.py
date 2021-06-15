@@ -64,12 +64,35 @@ class CEXProject(object):
             return None
         other_paths = list(map(lambda l: l.path, filter(lambda bb: bb.hash != b.hash, [self.bin] + self.libs)))
 
+        def gen_callgraph_with_fixpoint(bin_info, addr, plugins):
+            while 1:
+                # Merge callgraphs until a fixpoint is reached (applies only to plugins that construct the callgraph lazily, e.g. Ghidra)
+                graphs        = list(map(lambda p: p.get_callgraph(bin_info.path, addr), plugins))
+                all_functions = set()
+                for g in graphs:
+                    for n in g.nodes:
+                        all_functions.add(n)
+
+                define_functions_result = list(map(lambda p: p.define_functions(bin_info.path, all_functions), plugins))
+                all_false = True
+                for r in define_functions_result:
+                    if r:
+                        all_false = False
+                        break
+                if all_false:
+                    break
+
+            res = merge_cgs(*graphs)
+            res = self._fix_addresses(res, bin_info)
+            return res
+
         if len([self.bin] + self.libs) == 1:
-            graphs = list(map(lambda p: p.get_callgraph(b.path, addr), self.plugins))
-            res    = merge_cgs(*graphs)
-            res    = self._fix_addresses(res, b)
+            res = gen_callgraph_with_fixpoint(b, addr, self.plugins)
             if addr is not None:
                 return nx.ego_graph(res, addr, radius=sys.maxsize)
+
+            import IPython; IPython.embed()
+
             return res
 
         self.get_depgraph()
@@ -109,9 +132,7 @@ class CEXProject(object):
                 continue
             processed.add(b)
 
-            graphs = list(map(lambda p: p.get_callgraph(b.path, None), self.non_multilib_plugins))
-            g      = merge_cgs(*graphs)
-            g      = self._fix_addresses(g, b)
+            g = gen_callgraph_with_fixpoint(b, addr, self.non_multilib_plugins)
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
