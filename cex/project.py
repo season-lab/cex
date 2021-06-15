@@ -91,8 +91,6 @@ class CEXProject(object):
             if addr is not None:
                 return nx.ego_graph(res, addr, radius=sys.maxsize)
 
-            import IPython; IPython.embed()
-
             return res
 
         self.get_depgraph()
