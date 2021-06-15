@@ -97,11 +97,16 @@ class CEXProject(object):
 
         def get_involved_libs(g):
             libs = set()
+            functions_to_define = dict()
             for n_id in g.nodes:
                 binfo = self.get_bin_containing(n_id)
                 if binfo is None:
                     continue
                 libs.add(binfo)
+                rebased_addr = n_id - binfo.min_addr + 0x400000
+                if binfo.path not in functions_to_define:
+                    functions_to_define[binfo.path] = set()
+                functions_to_define[binfo.path].add(rebased_addr)
 
                 if n_id in self._lib_dep_graph_edges:
                     dst_addr = self._lib_dep_graph_edges[n_id]
@@ -109,6 +114,12 @@ class CEXProject(object):
                     if binfo is None:
                         continue
                     libs.add(binfo)
+
+            # Define potentially new functions
+            for bin in functions_to_define:
+                for p in self.plugins:
+                    p.define_functions(bin, list(functions_to_define[bin]))
+
             return libs
 
         def add_depgraph_edges(g):
@@ -123,7 +134,7 @@ class CEXProject(object):
         res = merge_cgs(*graphs)
 
         processed = set()
-        stack     = [b]
+        stack     = list(get_involved_libs(res))
         while stack:
             b = stack.pop()
             if b in processed:

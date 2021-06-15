@@ -39,6 +39,7 @@ public class CreateFunctions extends HeadlessScript {
 	}
 
 	private boolean createIfMissing(Address addr) throws Exception {
+		printf("[DEBUG] creating %s\n", addr.toString());
 		boolean is_thumb = false;
 		if (isARM() && (addr.getOffset() % 2 == 1)) {
 			addr = addr.subtract(1);
@@ -46,16 +47,20 @@ public class CreateFunctions extends HeadlessScript {
 		}
 
 		Function f = getFunctionAt(addr);
-		if (f != null)
+		if (f != null) {
+			printf("[DEBUG] already there!");
 			return false;
+		}
 
 		f = createFunction(addr, null);
 		if (f == null)
 			// Weird, but works
 			f = createFunction(addr, null);
 
-		if (f == null)
+		if (f == null) {
+			printf("[DEBUG] creation failed");
 			return false;
+		}
 
 		if (is_thumb)
 			setThumb(f);
@@ -85,7 +90,8 @@ public class CreateFunctions extends HeadlessScript {
 					created_at_least_one = created_at_least_one || processFunctionCalleesRecursive(callee, processed);
 			}
 		}
-		return created_at_least_one;
+		// Calling the decompiler can create functions... We need to be conservative
+		return true;
 	}
 
 	public void run() throws Exception {
