@@ -19,6 +19,7 @@ class BinInfo(object):
             return True
         if symbol_name in blacklisted:
             return True
+        return False
 
     def __init__(self, bin, addr=None):
         self.path = bin
