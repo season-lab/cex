@@ -274,7 +274,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                             sys.stderr.write("WARNING: %#x (src) not in nodes\n" % src)
                             continue
                         if dst not in cg.nodes:
-                            sys.stderr.write("WARNING: %#x (dst) not in nodes\n" % src)
+                            sys.stderr.write("WARNING: %#x (dst) not in nodes\n" % dst)
                             continue
                         cg.add_edge(src, dst)
             self.data[binary].cg = cg
@@ -297,6 +297,9 @@ class GhidraCfgExtractor(ICfgExtractor):
                 for call in fun_raw["calls"]:
                     dst      = int(call["offset"], 16)
                     callsite = int(call["callsite"], 16)
+                    if dst not in cg.nodes:
+                        sys.stderr.write("WARNING: %#x (dst) not in nodes\n" % dst)
+                        continue
                     cg.add_edge(src, dst, callsite=callsite)
 
             self.data[binary].acc_cg = cg
