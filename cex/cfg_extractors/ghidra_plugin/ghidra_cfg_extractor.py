@@ -23,6 +23,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
+        "-analysisTimeoutPerFile", "3600",
         "-import",
         "$BINARY",
         "-scriptPath",
