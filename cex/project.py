@@ -103,10 +103,6 @@ class CEXProject(object):
                 if binfo is None:
                     continue
                 libs.add(binfo)
-                rebased_addr = n_id - binfo.min_addr + 0x400000
-                if binfo.path not in functions_to_define:
-                    functions_to_define[binfo.path] = set()
-                functions_to_define[binfo.path].add(rebased_addr)
 
                 if n_id in self._lib_dep_graph_edges:
                     dst_addr = self._lib_dep_graph_edges[n_id]
@@ -114,6 +110,10 @@ class CEXProject(object):
                     if binfo is None:
                         continue
                     libs.add(binfo)
+                    rebased_addr = n_id - binfo.min_addr + 0x400000
+                    if binfo.path not in functions_to_define:
+                        functions_to_define[binfo.path] = set()
+                    functions_to_define[binfo.path].add(rebased_addr)
 
             # Define potentially new functions
             for bin in functions_to_define:
@@ -134,14 +134,13 @@ class CEXProject(object):
         res = merge_cgs(*graphs)
 
         processed = set()
-        stack     = list(get_involved_libs(res))
+        stack = [self.bin]
         while stack:
             b = stack.pop()
             if b in processed:
                 continue
             processed.add(b)
-
-            g = gen_callgraph_with_fixpoint(b, addr, self.non_multilib_plugins)
+            g = gen_callgraph_with_fixpoint(b, None, self.non_multilib_plugins)
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)

@@ -72,6 +72,9 @@ public class CreateFunctions extends HeadlessScript {
 		if (processed.contains(f))
 			return false;
 		processed.add(f);
+		printf("[DEBUG] recursively processing %s", f.toString());
+		for (Function callee : f.getCallingFunctions(monitor))
+			printf("[DEBUG] calling function: %s", callee.toString());
 
 		boolean created_at_least_one = false;
 		DecompileResults dr = ifc.decompileFunction(f, 300, monitor);
