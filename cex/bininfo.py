@@ -7,6 +7,20 @@ from collections import namedtuple
 FunctionDescription = namedtuple("FunctionDescription", ["name", "offset", "is_exported"])
 
 class BinInfo(object):
+
+    @staticmethod
+    def is_blacklisted(symbol_name):
+        # Erroneously tagged as exported by rizin
+
+        blacklisted = {"__cxa_pure_virtual"}
+        if symbol_name.startswith("__android_log"):
+            return True
+        if symbol_name.startswith("__aeabi_"):
+            return True
+        if symbol_name in blacklisted:
+            return True
+        return False
+
     def __init__(self, bin, addr=None):
         self.path = bin
         self.name = os.path.basename(bin)
@@ -42,6 +56,8 @@ class BinInfo(object):
                         name=symbol["name"].replace("imp.", ""),
                         offset=symbol["vaddr"] + self.min_addr,
                         is_exported=False))
+            elif BinInfo.is_blacklisted(symbol["name"]):
+                continue
             else:
                 self.exported_functions.append(
                     FunctionDescription(

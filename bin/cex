@@ -12,6 +12,41 @@ from cex.utils import to_dot, to_json
 def get_plugins():
     return "Plugins: " + " ".join(CEXProject.pm.get_plugin_names())
 
+def to_dot_depgraph(proj, graph, include_edges=False):
+    bins = proj.get_bins()
+    hash_dict = dict()
+    for binfo in bins:
+        hash_dict[binfo.hash] = binfo
+
+    header  = "digraph {\n\tnode [shape=box];\n"
+    header += "\tgraph [fontname = \"monospace\"];\n"
+    header += "\tnode  [fontname = \"monospace\"];\n"
+    header += "\tedge  [fontname = \"monospace\"];\n"
+    footer  = "}\n"
+
+    body = ""
+    for node_id in graph.nodes:
+        body += "\tnode_%s [label=\"%s\"];\n" % (node_id, hash_dict[node_id].name)
+
+    for src_id, dst_id, i in graph.edges:
+        if not include_edges and i != 0:
+            continue
+
+        e = graph.edges[src_id, dst_id, i]
+        label = "" if not include_edges else e["fun"]
+        body += "\tnode_%s -> node_%s [label=\"%s\"];\n" % (src_id, dst_id, label)
+
+    return header + body + footer
+
+def dump_dot_depgraph(proj, graph, outdir=None):
+    dot = to_dot_depgraph(proj, graph)
+    if outdir is None:
+        print(dot)
+        return
+
+    with open(os.path.join(outdir, "depgraph.dot"), "w") as fout:
+        fout.write(dot)
+
 def dump_dot_cg(addr, graph, outdir=None):
     dot = to_dot(graph)
     if outdir is None:
@@ -84,6 +119,10 @@ def main(args):
     libs   = args.libs
     proj   = CEXProject(binary, libs=libs, plugins=plugins)
 
+    if args.dump_dot_depgraph:
+        depgraph = proj.get_depgraph()
+        dump_dot_depgraph(proj, depgraph, args.output)
+
     cgs_dot    = args.dump_dot_cg or []
     icfgs_dot  = args.dump_dot_icfg or []
     cfgs_dot   = args.dump_dot_cfg or []
@@ -135,6 +174,7 @@ if __name__=="__main__":
     parser.add_argument("--dump-json-icfg", metavar="ADDR", help="Dump the interprocedural CFG in json from ADDR entrypoint. If '-', program entrypoint.", nargs="*")
     parser.add_argument("--dump-dot-cfg", metavar="ADDR", help="Dump the control flow graph of the function in dot at address ADDR", nargs="*")
     parser.add_argument("--dump-json-cfg", metavar="ADDR", help="Dump the control flow graph of the function in json at address ADDR", nargs="*")
+    parser.add_argument("--dump-dot-depgraph", help="Dump the library dependency graph", action="store_true")
     parser.add_argument("binary", help="The binary to analyze")
     parser.add_argument("libs", help="Other libraries", nargs="*")
 

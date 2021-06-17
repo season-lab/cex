@@ -75,7 +75,7 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 		iter_functions = listing.getFunctions(true);
 		while (iter_functions.hasNext() && !monitor.isCancelled()) {
 			Function f = iter_functions.next();
-			if (external_functions.contains(f.getEntryPoint().getOffset()))
+			if (false && external_functions.contains(f.getEntryPoint().getOffset()))
 				continue;
 
 			if (f_need_comma)
