@@ -37,6 +37,7 @@ class CEXProject(object):
 
         self._lib_dep_graph       = None
         self._lib_dep_graph_edges = dict()
+        self._lib_dep_graph_funcs = dict()
 
     def get_bins(self):
         return [self.bin] + self.libs
@@ -77,17 +78,28 @@ class CEXProject(object):
         def get_involved_libs(g):
             libs = set()
             for n_id in g.nodes:
-                binfo = self.get_bin_containing(n_id)
-                if binfo is None:
+                node_binfo = self.get_bin_containing(n_id)
+                if node_binfo is None:
                     continue
-                libs.add(binfo)
+                libs.add(node_binfo)
 
                 if n_id in self._lib_dep_graph_edges:
                     dst_addr = self._lib_dep_graph_edges[n_id]
-                    binfo = self.get_bin_containing(dst_addr)
+                    binfo    = self.get_bin_containing(dst_addr)
                     if binfo is None:
                         continue
                     libs.add(binfo)
+
+                # Use also the API get_external_calls_of (currently implemented only in Ghidra)
+                for p in self.plugins:
+                    for ext_call in p.get_external_calls_of(node_binfo.path, node_binfo.rebase_addr(n_id, 0x400000)):
+                        if ext_call.ext_name in self._lib_dep_graph_funcs:
+                            dst_addr = self._lib_dep_graph_funcs[ext_call.ext_name]
+                            binfo    = self.get_bin_containing(dst_addr)
+                            if binfo is None:
+                                continue
+                            libs.add(binfo)
+
             return libs
 
         def add_depgraph_edges(g):
@@ -95,6 +107,18 @@ class CEXProject(object):
                 dst = self._lib_dep_graph_edges[src]
                 if src in g.nodes and dst in g.nodes:
                     g.add_edge(src, dst, callsite=src)
+
+            for src in g.nodes:
+                binfo = self.get_bin_containing(src)
+                if binfo is None:
+                    continue
+
+                for p in self.plugins:
+                    for ext_call in p.get_external_calls_of(binfo.path, binfo.rebase_addr(src, 0x400000)):
+                        if ext_call.ext_name in self._lib_dep_graph_funcs:
+                            dst = self._lib_dep_graph_funcs[ext_call.ext_name]
+                            if dst in g.nodes:
+                                g.add_edge(src, dst, callsite=ext_call.callsite)
             return g
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
@@ -115,6 +139,8 @@ class CEXProject(object):
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
+            if addr is not None:
+                res = nx.ego_graph(res, addr, radius=sys.maxsize)
 
             for lib in get_involved_libs(res):
                 if lib not in processed:
@@ -253,6 +279,7 @@ class CEXProject(object):
                         g.add_edge(bin_src.hash, bin_dst.hash, fun=fun_src.name,
                             src_off=fun_src.offset, dst_off=fun_dst.offset)
                         self._lib_dep_graph_edges[fun_src.offset] = fun_dst.offset
+                        self._lib_dep_graph_funcs[fun_dst.name]   = fun_dst.offset
 
         self._lib_dep_graph = g
         return self._lib_dep_graph

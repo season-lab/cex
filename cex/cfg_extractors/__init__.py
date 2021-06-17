@@ -2,9 +2,13 @@ import sys
 
 from cex.utils import normalize_graph
 from yapsy.IPlugin import IPlugin
+from collections import namedtuple
+
 
 import os
 import networkx as nx
+
+ExtCallInfo = namedtuple("ExtCallInfo", ["fun_addr", "ext_name", "callsite"])
 
 class FunctionNotFoundException(Exception):
     def __init__(self, addr):
@@ -120,6 +124,11 @@ class ICfgExtractor(IPlugin):
     def clear_cache(self):
         return  # Look in subclasses
 
+    def get_external_calls_of(self, binary, addr):
+        # Look in subclasses. If a plugin implements this method, then
+        # it must return the list of external functions that the function at addr calls
+        # ret_type: ExtCallInfo
+        return list()
 
 class IMultilibCfgExtractor(object):
     def get_multi_callgraph(self, binary, libraries=None, entry=None, addresses=None):

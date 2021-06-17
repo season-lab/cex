@@ -75,7 +75,7 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 		iter_functions = listing.getFunctions(true);
 		while (iter_functions.hasNext() && !monitor.isCancelled()) {
 			Function f = iter_functions.next();
-			if (false && external_functions.contains(f.getEntryPoint().getOffset()))
+			if (external_functions.contains(f.getEntryPoint().getOffset()))
 				continue;
 
 			if (f_need_comma)
@@ -98,8 +98,6 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 						continue;
 
 					Address target = op.getInput(0).getAddress();
-					if (external_functions.contains(target.getOffset()))
-						continue;
 
 					// Create target function if not exists (rare, but sometimes Ghidra
 					// defines the target function as a subroutine instead of function)
@@ -114,9 +112,15 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 					else
 						need_comma = true;
 
-
-					pout.format("      { \"offset\": \"%#x\", \"callsite\" : \"%#x\" }",
-						target.getOffset(), op.getSeqnum().getTarget().getOffset());
+					if (external_functions.contains(target.getOffset())) {
+						Function ext_f = getFunctionAt(target);
+						if (ext_f != null)
+							pout.format("      { \"name\": \"%s\", \"callsite\" : \"%#x\", \"type\" : \"external\" }",
+								ext_f.getName(), op.getSeqnum().getTarget().getOffset());
+					} else {
+						pout.format("      { \"offset\": \"%#x\", \"callsite\" : \"%#x\", \"type\" : \"normal\" }",
+							target.getOffset(), op.getSeqnum().getTarget().getOffset());
+					}
 				}
 			}
 

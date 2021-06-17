@@ -4,16 +4,17 @@ import json
 import subprocess
 import networkx as nx
 
-from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
+from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, ExtCallInfo
 from cex.cfg_extractors.utils import check_pie, get_md5_file
 
 
 class GhidraBinaryData(object):
-    def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None):
-        self.cfg_raw = cfg_raw
-        self.cg_raw  = cg_raw
-        self.cg      = cg
-        self.acc_cg  = acc_cg
+    def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None, ext_calls=None):
+        self.cfg_raw   = cfg_raw
+        self.cg_raw    = cg_raw
+        self.cg        = cg
+        self.acc_cg    = acc_cg
+        self.ext_calls = ext_calls or dict()
 
 
 class GhidraCfgExtractor(ICfgExtractor):
@@ -292,9 +293,20 @@ class GhidraCfgExtractor(ICfgExtractor):
                 fun_name = fun_raw["name"]
                 cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name))
 
+                for call in fun_raw["calls"]:
+                    if call["type"] == "external":
+                        name     = call["name"]
+                        callsite = int(call["callsite"], 16)
+                        if fun_addr not in self.data[binary].ext_calls:
+                            self.data[binary].ext_calls[fun_addr] = list()
+                        self.data[binary].ext_calls[fun_addr].append(ExtCallInfo(fun_addr, name, callsite))
+
             for fun_raw in self.data[binary].cg_raw:
                 src = int(fun_raw["addr"], 16)
                 for call in fun_raw["calls"]:
+                    if call["type"] == "external":
+                        continue
+
                     dst      = int(call["offset"], 16)
                     callsite = int(call["callsite"], 16)
                     if dst not in cg.nodes:
@@ -306,6 +318,13 @@ class GhidraCfgExtractor(ICfgExtractor):
 
         # Ignore entry, the caller is in charge of pruning the CG
         return self.data[binary].acc_cg
+
+    def get_external_calls_of(self, binary, addr):
+        if binary not in self.data:
+            return list()
+        if addr not in self.data[binary].ext_calls:
+            return list()
+        return self.data[binary].ext_calls[addr]
 
     def get_callgraph(self, binary, entry=None):
         if self.use_accurate:
