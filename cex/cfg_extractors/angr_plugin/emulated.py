@@ -109,7 +109,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         if AngrCfgExtractor.is_arm(proj):
             is_arm = True
 
-        icfg_raw = self._get_angr_cfg(proj, entry)
+        icfg_raw = self._get_angr_cfg(proj, orig_entry)
 
         g = nx.MultiDiGraph()
         for src in proj.kb.functions:
