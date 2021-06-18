@@ -7,6 +7,8 @@ import networkx as nx
 from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, ExtCallInfo
 from cex.cfg_extractors.utils import check_pie, get_md5_file
 
+TIMEOUT = "1200"
+
 
 class GhidraBinaryData(object):
     def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None, ext_calls=None):
@@ -23,7 +25,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", "3600",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-scriptPath",
@@ -59,7 +61,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", "3600",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
@@ -72,7 +74,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", "3600",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
@@ -98,7 +100,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", "3600",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
