@@ -70,7 +70,7 @@ class CEXProject(object):
             res    = merge_cgs(*graphs)
             res    = self._fix_addresses(res, b)
             if addr is not None:
-                return nx.ego_graph(res, addr, radius=sys.maxsize)
+                return res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
             return res
 
         self.get_depgraph()
@@ -140,7 +140,7 @@ class CEXProject(object):
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
             if addr is not None:
-                res = nx.ego_graph(res, addr, radius=sys.maxsize)
+                res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
 
             for lib in get_involved_libs(res):
                 if lib not in processed:
@@ -148,7 +148,7 @@ class CEXProject(object):
 
         res = add_depgraph_edges(res)
         if addr is not None:
-            res = nx.ego_graph(res, addr, radius=sys.maxsize)
+            res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
         return res
 
     def get_cfg(self, addr, no_multilib=False):
@@ -252,7 +252,7 @@ class CEXProject(object):
                 res_g  = merge_cfgs(res_g, *graphs)
 
         g = normalize_graph(res_g)
-        return nx.ego_graph(g, entry, radius=sys.maxsize)
+        return g.subgraph(nx.dfs_postorder_nodes(g, entry)).copy()
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:

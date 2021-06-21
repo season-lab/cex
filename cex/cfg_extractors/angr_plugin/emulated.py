@@ -159,7 +159,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
                     g.add_edge(src, dst, callsite=callsite)
 
-        self.multi_cache[h].cg[entry] = nx.ego_graph(g, orig_entry, radius=sys.maxsize)
+        self.multi_cache[h].cg[entry] = g.subgraph(nx.dfs_postorder_nodes(g, orig_entry)).copy()
         self.multi_cache[h].icfg_raw[entry] = icfg_raw
         return self.multi_cache[h].cg[entry]
 
@@ -225,7 +225,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 continue
             g.add_edge(src_addr, dst_addr)
 
-        g = nx.ego_graph(g, entry, radius=sys.maxsize)
+        g = g.subgraph(nx.dfs_postorder_nodes(g, entry)).copy()
         self.multi_cache[h].icfg[entry] = g
 
         return g
