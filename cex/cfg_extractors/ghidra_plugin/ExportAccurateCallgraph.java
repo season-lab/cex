@@ -84,8 +84,8 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 				f_need_comma = true;
 
 
-			pout.format("  {\n" + "    \"name\": \"%s\",\n" + "    \"addr\": \"%#x\",\n" + "    \"calls\": [\n",
-					f.getName(), f.getEntryPoint().getOffset());
+			pout.format("  {\n" + "    \"name\": \"%s\",\n" + "    \"addr\": \"%#x\",\n" + "    \"is_returning\": \"%s\",\n" + "    \"calls\": [\n",
+					f.getName(), f.getEntryPoint().getOffset(), f.hasNoReturn() ? "false" : "true");
 
 			DecompileResults dr = ifc.decompileFunction(f, 300, monitor);
 			HighFunction h = dr.getHighFunction();
@@ -121,6 +121,22 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 						pout.format("      { \"offset\": \"%#x\", \"callsite\" : \"%#x\", \"type\" : \"normal\" }",
 							target.getOffset(), op.getSeqnum().getTarget().getOffset());
 					}
+				}
+
+				pout.format("\n    ],\n    \"return_sites\": [\n");
+				need_comma = false;
+				opcodes_iter = h.getPcodeOps();
+				while (opcodes_iter.hasNext()) {
+					PcodeOpAST op = opcodes_iter.next();
+					if (op.getOpcode() != PcodeOp.RETURN)
+						continue;
+
+					if (need_comma)
+						pout.format(",\n");
+					else
+						need_comma = true;
+
+					pout.format("      \"%#x\"", op.getSeqnum().getTarget().getOffset());
 				}
 			}
 
