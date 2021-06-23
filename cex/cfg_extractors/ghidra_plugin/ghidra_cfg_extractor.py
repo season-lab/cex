@@ -358,7 +358,7 @@ class GhidraCfgExtractor(ICfgExtractor):
             addr  = int(block_raw["addr"], 16)
             insns = list()
             for insn in block_raw["instructions"]:
-                insns.append(CFGInstruction(addr=int(insn["addr"], 16), call_refs=list(), mnemonic=insn["mnemonic"]))
+                insns.append(CFGInstruction(addr=int(insn["addr"], 16), size=int(insn["size"]), call_refs=list(), mnemonic=insn["mnemonic"]))
             calls = list(map(lambda x: int(x, 16), block_raw["calls"]))
 
             if len(calls) > 0:

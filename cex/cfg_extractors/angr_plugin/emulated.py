@@ -195,7 +195,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 addr = insn.insn.address
                 if is_arm:
                     addr -= addr % 2
-                insns.append(CFGInstruction(addr=addr, call_refs=list(), mnemonic=mnemonic))
+                insns.append(CFGInstruction(addr=addr, size=insn.size, call_refs=list(), mnemonic=mnemonic))
 
             if len(insns) == 0:
                 return

@@ -16,8 +16,9 @@ class FunctionNotFoundException(Exception):
 
 
 class CFGInstruction(object):
-    def __init__(self, addr: int, call_refs: list, mnemonic: str):
+    def __init__(self, addr: int, size: int, call_refs: list, mnemonic: str):
         self.addr      = addr
+        self.size      = size
         self.mnemonic  = mnemonic
         self.call_refs = call_refs
 
