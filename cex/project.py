@@ -102,11 +102,18 @@ class CEXProject(object):
 
             return libs
 
+        def edge_present(g, src, dst, callsite):
+            for e in g.out_edges(src, keys=True):
+                if e[1] == dst and g.edges[e]["callsite"] == callsite:
+                    return True
+            return False
+
         def add_depgraph_edges(g):
             for src in self._lib_dep_graph_edges:
                 dst = self._lib_dep_graph_edges[src]
                 if src in g.nodes and dst in g.nodes:
-                    g.add_edge(src, dst, callsite=src)
+                    if not edge_present(g, src, dst, src):
+                        g.add_edge(src, dst, callsite=src)
 
             for src in g.nodes:
                 binfo = self.get_bin_containing(src)
@@ -118,7 +125,15 @@ class CEXProject(object):
                         if ext_call.ext_name in self._lib_dep_graph_funcs:
                             dst = self._lib_dep_graph_funcs[ext_call.ext_name]
                             if dst in g.nodes:
-                                g.add_edge(src, dst, callsite=ext_call.callsite)
+                                # Remove fake return if we succeeded in linking the function
+                                data = g.nodes[src]["data"]
+                                new_ret = list()
+                                for r in data.return_sites:
+                                    if r != src:
+                                        new_ret.append(r)
+                                g.nodes[src]["data"].return_sites = new_ret
+                                if not edge_present(g, src, dst, ext_call.callsite):
+                                    g.add_edge(src, dst, callsite=ext_call.callsite)
             return g
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
@@ -185,13 +200,21 @@ class CEXProject(object):
             return cfg
 
         def is_return(bb):
-            # Superdumb... Improve it
+            # Superdumb fallthrough
             return ": ret" in bb.get_dot_label().lower() or ": bx lr" in bb.get_dot_label().lower()
 
         ret_nodes_cache = dict()
-        def get_ret_nodes(entry, cfg):
+        def get_ret_nodes(entry, cg, cfg):
             if entry in ret_nodes_cache:
                 return ret_nodes_cache[entry]
+
+            if entry in cg.nodes:
+                data = cg.nodes[entry]["data"]
+                if data.is_returning and len(data.return_sites) > 0:
+                    ret_nodes_cache[entry] = data.return_sites
+                    return ret_nodes_cache[entry]
+                if not data.is_returning:
+                    return list()
 
             ret_nodes = list()
             for addr in cfg.nodes:
@@ -232,15 +255,26 @@ class CEXProject(object):
 
             # Easy edge
             retaddr = get_ret_addr(cfgs[addr_src], callsite)
+            is_a_jmp = retaddr is None
 
             # HARD ret edges. Best effort
+            ret_addresses = []
             if retaddr is None:
-                # FIXME: this happens for example with PLT calls between libraries
-                continue
-            for ret_node in get_ret_nodes(addr_dst, cfgs[addr_dst]):
-                assert ret_node in res_g.nodes
-                assert retaddr  in res_g.nodes
-                res_g.add_edge(ret_node, retaddr)
+                for pred in cg.predecessors(addr_src):
+                    data = cg.get_edge_data(pred, addr_src)
+                    for k in data:
+                        callsite = data[k]["callsite"]
+                        r = get_ret_addr(cfgs[pred], callsite)
+                        if r is not None:
+                            ret_addresses.append(r)
+            else:
+                ret_addresses.append(retaddr)
+
+            for retaddr in ret_addresses:
+                for ret_node in get_ret_nodes(addr_dst, cg, cfgs[addr_dst]):
+                    assert ret_node in res_g.nodes
+                    assert retaddr  in res_g.nodes
+                    res_g.add_edge(ret_node, retaddr)
 
         if use_multilib_icfg:
             # Dont reconstruct the CFG of every single function, but use the

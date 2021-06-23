@@ -293,7 +293,10 @@ class GhidraCfgExtractor(ICfgExtractor):
             for fun_raw in self.data[binary].cg_raw:
                 fun_addr = int(fun_raw["addr"], 16)
                 fun_name = fun_raw["name"]
-                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name))
+                is_returning = fun_raw["is_returning"]
+                ret_sites    = list(map(lambda r: int(r, 16), fun_raw["return_sites"]))
+                cg.add_node(fun_addr, data=CGNodeData(
+                    addr=fun_addr, name=fun_name, is_returning=is_returning, return_sites=ret_sites))
 
                 for call in fun_raw["calls"]:
                     if call["type"] == "external":

@@ -135,6 +135,9 @@ def fix_graph_addresses(graph, off):
         if hasattr(data, "insns"):
             for i in range(len(data.insns)):
                 data.insns[i].addr += off
+        if hasattr(data, "return_sites"):
+            for i in range(len(data.return_sites)):
+                data.return_sites[i] += off
 
     for e in graph.edges:
         if len(e) == 2:

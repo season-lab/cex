@@ -82,9 +82,11 @@ class CFGNodeData(object):
 
 
 class CGNodeData(object):
-    def __init__(self, addr: int, name: str):
+    def __init__(self, addr: int, name: str, is_returning=True, return_sites=None):
         self.name = name
         self.addr = addr
+        self.is_returning = is_returning
+        self.return_sites = return_sites or list()
 
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
