@@ -143,7 +143,7 @@ class RZCfgExtractor(ICfgExtractor):
                 disasm = "???"
                 if "disasm" in op:
                     disasm = op["disasm"]
-                insns.append(CFGInstruction(addr=op["offset"], call_refs=call_refs, mnemonic=disasm))
+                insns.append(CFGInstruction(addr=op["offset"], size=op["size"], call_refs=call_refs, mnemonic=disasm))
 
             if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
                 prev_op = 0
