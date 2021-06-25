@@ -138,7 +138,8 @@ public class ExportAccurateCallgraph extends HeadlessScript {
 
 					pout.format("      \"%#x\"", op.getSeqnum().getTarget().getOffset());
 				}
-			}
+			} else
+				pout.format("\n    ],\n    \"return_sites\": [\n");
 
 			pout.format("\n    ]\n  }\n");
 		}
