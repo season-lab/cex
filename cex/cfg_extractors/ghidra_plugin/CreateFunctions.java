@@ -39,7 +39,7 @@ public class CreateFunctions extends HeadlessScript {
 	}
 
 	private boolean createIfMissing(Address addr) throws Exception {
-		printf("[DEBUG] creating %s\n", addr.toString());
+		// printf("[DEBUG] creating %s\n", addr.toString());
 		boolean is_thumb = false;
 		if (isARM() && (addr.getOffset() % 2 == 1)) {
 			addr = addr.subtract(1);
@@ -72,9 +72,9 @@ public class CreateFunctions extends HeadlessScript {
 		if (processed.contains(f))
 			return false;
 		processed.add(f);
-		printf("[DEBUG] recursively processing %s", f.toString());
-		for (Function callee : f.getCallingFunctions(monitor))
-			printf("[DEBUG] calling function: %s", callee.toString());
+		disassemble(f.getEntryPoint());
+		analyzeChanges(currentProgram);
+		printf("[CREATED_FUNCTION] 0x%x\n", f.getEntryPoint().getOffset());
 
 		boolean created_at_least_one = false;
 		DecompileResults dr = ifc.decompileFunction(f, 300, monitor);
@@ -135,10 +135,5 @@ public class CreateFunctions extends HeadlessScript {
 		} catch (IOException e) {
 			System.err.println(path + " is not a valid filename");
 		}
-
-		if (at_least_one_created)
-			System.out.println("[OUTPUT_MSG] OK");
-		else
-			System.out.println("[OUTPUT_MSG] KO");
 	}
 }

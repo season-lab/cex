@@ -4,17 +4,20 @@ import json
 import subprocess
 import networkx as nx
 
-from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor
+from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, ExtCallInfo
 from cex.cfg_extractors.utils import check_pie, get_md5_file
+
+TIMEOUT = "1200"
 
 
 class GhidraBinaryData(object):
-    def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None):
+    def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None, ext_calls=None):
         self.cfg_raw = cfg_raw
         self.cg_raw  = cg_raw
         self.cg      = cg
         self.acc_cg  = acc_cg
         self.defined_functions = set()
+        self.ext_calls = ext_calls or dict()
 
 
 class GhidraCfgExtractor(ICfgExtractor):
@@ -23,7 +26,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", "3600",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-scriptPath",
@@ -60,6 +63,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$PROJ_FOLDER",
         "$PROJ_NAME",
         "-noanalysis",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
@@ -73,6 +77,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$PROJ_FOLDER",
         "$PROJ_NAME",
         "-noanalysis",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
@@ -99,6 +104,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$PROJ_FOLDER",
         "$PROJ_NAME",
         "-noanalysis",
+        "-analysisTimeoutPerFile", TIMEOUT,
         "-import",
         "$BINARY",
         "-postScript",
@@ -315,9 +321,20 @@ class GhidraCfgExtractor(ICfgExtractor):
                 fout.write("%#x\n" % off)
 
         cmd = self._get_cmd_custom_functions(binary, infile)
-        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode("ascii")
 
-        if b"[OUTPUT_MSG] OK" in out:
+        new_functions = set()
+        for line in out.splitlines():
+            line = line.strip()
+            if "[CREATED_FUNCTION]" in line:
+                off = line[line.find("[CREATED_FUNCTION] ") + len("[CREATED_FUNCTION] "):]
+                off = off[:off.find(" ")]
+                off = int(off, 16)
+                new_functions.add(off)
+
+        if len(new_functions - self.data[binary].defined_functions) > 0:
+            self.data[binary].defined_functions |= new_functions
+            self._cache_defined_functions(binary)
             self.clear_cg_cfg_cache_for_binary(binary)
             return True
         return False
@@ -361,11 +378,30 @@ class GhidraCfgExtractor(ICfgExtractor):
             for fun_raw in self.data[binary].cg_raw:
                 fun_addr = int(fun_raw["addr"], 16)
                 fun_name = fun_raw["name"]
-                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name))
+                is_returning = fun_raw["is_returning"]
+                ret_sites    = list(map(lambda r: int(r, 16), fun_raw["return_sites"]))
+                cg.add_node(fun_addr, data=CGNodeData(
+                    addr=fun_addr, name=fun_name, is_returning=is_returning, return_sites=ret_sites))
+
+                for call in fun_raw["calls"]:
+                    if call["type"] == "external":
+                        name     = call["name"]
+                        callsite = int(call["callsite"], 16)
+                        if fun_addr not in self.data[binary].ext_calls:
+                            self.data[binary].ext_calls[fun_addr] = list()
+                        self.data[binary].ext_calls[fun_addr].append(ExtCallInfo(fun_addr, name, callsite))
 
             for fun_raw in self.data[binary].cg_raw:
+                if fun_raw["name"] == "operator.new":
+                    # AngrEmulated has "new" model, so its callgraph does not have
+                    # the successors of this node. Let's skip it for consistency
+                    continue
+
                 src = int(fun_raw["addr"], 16)
                 for call in fun_raw["calls"]:
+                    if call["type"] == "external":
+                        continue
+
                     dst      = int(call["offset"], 16)
                     callsite = int(call["callsite"], 16)
                     if dst not in cg.nodes:
@@ -375,8 +411,16 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             self.data[binary].acc_cg = cg
 
-        # Ignore entry, the caller is in charge of pruning the CG
+        res = self.data[binary].acc_cg
+        self.data[binary].acc_cg = res.subgraph(nx.dfs_postorder_nodes(res, entry)).copy()
         return self.data[binary].acc_cg
+
+    def get_external_calls_of(self, binary, addr):
+        if binary not in self.data:
+            return list()
+        if addr not in self.data[binary].ext_calls:
+            return list()
+        return self.data[binary].ext_calls[addr]
 
     def get_callgraph(self, binary, entry=None):
         if self.use_accurate:

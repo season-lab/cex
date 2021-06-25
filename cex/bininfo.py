@@ -77,6 +77,9 @@ class BinInfo(object):
     def contains_addr(self, addr):
         return self.min_addr <= addr < self.max_addr
 
+    def rebase_addr(self, addr, newbase):
+        return addr - self.min_addr + newbase
+
     def _open_rz(self):
         return rzpipe.open(self.path, flags=["-2"])
 

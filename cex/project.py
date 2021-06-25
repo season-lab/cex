@@ -37,6 +37,7 @@ class CEXProject(object):
 
         self._lib_dep_graph       = None
         self._lib_dep_graph_edges = dict()
+        self._lib_dep_graph_funcs = dict()
 
     def get_bins(self):
         return [self.bin] + self.libs
@@ -89,9 +90,12 @@ class CEXProject(object):
         if len([self.bin] + self.libs) == 1:
             res = gen_callgraph_with_fixpoint(b, addr, self.plugins)
             if addr is not None:
-                return nx.ego_graph(res, addr, radius=sys.maxsize)
-
+                return res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
             return res
+
+        if addr is not None:
+            for p in self.plugins:
+                p.define_functions(b.path, [addr])
 
         self.get_depgraph()
 
@@ -99,21 +103,34 @@ class CEXProject(object):
             libs = set()
             functions_to_define = dict()
             for n_id in g.nodes:
-                binfo = self.get_bin_containing(n_id)
-                if binfo is None:
+                node_binfo = self.get_bin_containing(n_id)
+                if node_binfo is None:
                     continue
-                libs.add(binfo)
+                libs.add(node_binfo)
 
                 if n_id in self._lib_dep_graph_edges:
                     dst_addr = self._lib_dep_graph_edges[n_id]
-                    binfo = self.get_bin_containing(dst_addr)
+                    binfo    = self.get_bin_containing(dst_addr)
                     if binfo is None:
                         continue
                     libs.add(binfo)
-                    rebased_addr = n_id - binfo.min_addr + 0x400000
+                    rebased_addr = dst_addr - binfo.min_addr + 0x400000
                     if binfo.path not in functions_to_define:
                         functions_to_define[binfo.path] = set()
                     functions_to_define[binfo.path].add(rebased_addr)
+
+                # Use also the API get_external_calls_of (currently implemented only in Ghidra)
+                for p in self.plugins:
+                    for ext_call in p.get_external_calls_of(node_binfo.path, node_binfo.rebase_addr(n_id, 0x400000)):
+                        if ext_call.ext_name in self._lib_dep_graph_funcs:
+                            dst_addr = self._lib_dep_graph_funcs[ext_call.ext_name]
+                            binfo    = self.get_bin_containing(dst_addr)
+                            if binfo is None:
+                                continue
+                            libs.add(binfo)
+                            if binfo.path not in functions_to_define:
+                                functions_to_define[binfo.path] = set()
+                            functions_to_define[binfo.path].add(dst_addr)
 
             # Define potentially new functions
             for bin in functions_to_define:
@@ -122,11 +139,38 @@ class CEXProject(object):
 
             return libs
 
+        def edge_present(g, src, dst, callsite):
+            for e in g.out_edges(src, keys=True):
+                if e[1] == dst and g.edges[e]["callsite"] == callsite:
+                    return True
+            return False
+
         def add_depgraph_edges(g):
             for src in self._lib_dep_graph_edges:
                 dst = self._lib_dep_graph_edges[src]
                 if src in g.nodes and dst in g.nodes:
-                    g.add_edge(src, dst, callsite=src)
+                    if not edge_present(g, src, dst, src):
+                        g.add_edge(src, dst, callsite=src)
+
+            for src in g.nodes:
+                binfo = self.get_bin_containing(src)
+                if binfo is None:
+                    continue
+
+                for p in self.plugins:
+                    for ext_call in p.get_external_calls_of(binfo.path, binfo.rebase_addr(src, 0x400000)):
+                        if ext_call.ext_name in self._lib_dep_graph_funcs:
+                            dst = self._lib_dep_graph_funcs[ext_call.ext_name]
+                            if dst in g.nodes:
+                                # Remove fake return if we succeeded in linking the function
+                                data = g.nodes[src]["data"]
+                                new_ret = list()
+                                for r in data.return_sites:
+                                    if r != src:
+                                        new_ret.append(r)
+                                g.nodes[src]["data"].return_sites = new_ret
+                                if not edge_present(g, src, dst, ext_call.callsite):
+                                    g.add_edge(src, dst, callsite=ext_call.callsite)
             return g
 
         graphs = list(map(lambda p: p.get_multi_callgraph(
@@ -144,6 +188,8 @@ class CEXProject(object):
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
+            if addr is not None:
+                res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
 
             for lib in get_involved_libs(res):
                 if lib not in processed:
@@ -151,7 +197,7 @@ class CEXProject(object):
 
         res = add_depgraph_edges(res)
         if addr is not None:
-            res = nx.ego_graph(res, addr, radius=sys.maxsize)
+            res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
         return res
 
     def get_cfg(self, addr, no_multilib=False):
@@ -188,13 +234,21 @@ class CEXProject(object):
             return cfg
 
         def is_return(bb):
-            # Superdumb... Improve it
+            # Superdumb fallthrough
             return ": ret" in bb.get_dot_label().lower() or ": bx lr" in bb.get_dot_label().lower()
 
         ret_nodes_cache = dict()
-        def get_ret_nodes(entry, cfg):
+        def get_ret_nodes(entry, cg, cfg):
             if entry in ret_nodes_cache:
                 return ret_nodes_cache[entry]
+
+            if entry in cg.nodes:
+                data = cg.nodes[entry]["data"]
+                if data.is_returning and len(data.return_sites) > 0:
+                    ret_nodes_cache[entry] = data.return_sites
+                    return ret_nodes_cache[entry]
+                if not data.is_returning:
+                    return list()
 
             ret_nodes = list()
             for addr in cfg.nodes:
@@ -237,13 +291,22 @@ class CEXProject(object):
             retaddr = get_ret_addr(cfgs[addr_src], callsite)
 
             # HARD ret edges. Best effort
+            ret_addresses = []
             if retaddr is None:
-                # FIXME: this happens for example with PLT calls between libraries
-                continue
-            for ret_node in get_ret_nodes(addr_dst, cfgs[addr_dst]):
-                assert ret_node in res_g.nodes
-                assert retaddr  in res_g.nodes
-                res_g.add_edge(ret_node, retaddr)
+                for pred in cg.predecessors(addr_src):
+                    data = cg.get_edge_data(pred, addr_src)
+                    for k in data:
+                        callsite = data[k]["callsite"]
+                        r = get_ret_addr(cfgs[pred], callsite)
+                        if r is not None:
+                            ret_addresses.append(r)
+            else:
+                ret_addresses.append(retaddr)
+
+            for retaddr in ret_addresses:
+                for ret_node in get_ret_nodes(addr_dst, cg, cfgs[addr_dst]):
+                    if ret_node in res_g.nodes and retaddr in res_g.nodes:
+                        res_g.add_edge(ret_node, retaddr)
 
         if use_multilib_icfg:
             # Dont reconstruct the CFG of every single function, but use the
@@ -255,7 +318,7 @@ class CEXProject(object):
                 res_g  = merge_cfgs(res_g, *graphs)
 
         g = normalize_graph(res_g)
-        return nx.ego_graph(g, entry, radius=sys.maxsize)
+        return g.subgraph(nx.dfs_postorder_nodes(g, entry)).copy()
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:
@@ -282,6 +345,7 @@ class CEXProject(object):
                         g.add_edge(bin_src.hash, bin_dst.hash, fun=fun_src.name,
                             src_off=fun_src.offset, dst_off=fun_dst.offset)
                         self._lib_dep_graph_edges[fun_src.offset] = fun_dst.offset
+                        self._lib_dep_graph_funcs[fun_dst.name]   = fun_dst.offset
 
         self._lib_dep_graph = g
         return self._lib_dep_graph

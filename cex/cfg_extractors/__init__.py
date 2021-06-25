@@ -2,9 +2,13 @@ import sys
 
 from cex.utils import normalize_graph
 from yapsy.IPlugin import IPlugin
+from collections import namedtuple
+
 
 import os
 import networkx as nx
+
+ExtCallInfo = namedtuple("ExtCallInfo", ["fun_addr", "ext_name", "callsite"])
 
 class FunctionNotFoundException(Exception):
     def __init__(self, addr):
@@ -78,9 +82,11 @@ class CFGNodeData(object):
 
 
 class CGNodeData(object):
-    def __init__(self, addr: int, name: str):
+    def __init__(self, addr: int, name: str, is_returning=True, return_sites=None):
         self.name = name
         self.addr = addr
+        self.is_returning = is_returning
+        self.return_sites = return_sites or list()
 
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
@@ -126,6 +132,11 @@ class ICfgExtractor(IPlugin):
     def clear_cache(self):
         return  # Look in subclasses
 
+    def get_external_calls_of(self, binary, addr):
+        # Look in subclasses. If a plugin implements this method, then
+        # it must return the list of external functions that the function at addr calls
+        # ret_type: ExtCallInfo
+        return list()
 
 class IMultilibCfgExtractor(object):
     def get_multi_callgraph(self, binary, libraries=None, entry=None, addresses=None):
