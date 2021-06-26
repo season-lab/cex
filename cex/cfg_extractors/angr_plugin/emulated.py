@@ -1,6 +1,6 @@
 import networkx as nx
+import logging
 import angr
-import sys
 import os
 
 from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor
@@ -19,6 +19,8 @@ class new(angr.SimProcedure):
 
 
 class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
+    log = logging.getLogger("cex.AngrCfgExtractorEmulated")
+
     def __init__(self):
         super().__init__()
 
@@ -52,10 +54,15 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         # We are accurate, but with an incomplete graph
         # NOTE: keep_state=True is necessary, otherwise
         #       SimProcedures are not called
-        return proj.analyses.CFGEmulated(
-            fail_fast=True, keep_state=True, starts=[addr],
-            context_sensitivity_level=1, call_depth=5,
-            initial_state=state)
+        try:
+            cfg = proj.analyses.CFGEmulated(
+                fail_fast=True, keep_state=True, starts=[addr],
+                context_sensitivity_level=1, call_depth=5,
+                initial_state=state)
+        except Exception as e:
+            AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % str(e))
+            cfg = None
+        return cfg
 
     @staticmethod
     def _get_multi_hash(binary: str, libraries: list):
@@ -110,6 +117,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             is_arm = True
 
         icfg_raw = self._get_angr_cfg(proj, orig_entry)
+        if icfg_raw is None:
+            return nx.MultiDiGraph()
 
         g = nx.MultiDiGraph()
         for src in proj.kb.functions:
@@ -174,7 +183,10 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             return self.multi_cache[h].icfg[entry]
 
         if entry not in self.multi_cache[h].icfg_raw:
-            self.multi_cache[h].icfg_raw[entry] = self._get_angr_cfg(proj, entry)
+            cfg = self._get_angr_cfg(proj, entry)
+            if cfg is None:
+                return nx.DiGraph()
+            self.multi_cache[h].icfg_raw[entry] = cfg
 
         cfg = self.multi_cache[h].icfg_raw[entry]
 
