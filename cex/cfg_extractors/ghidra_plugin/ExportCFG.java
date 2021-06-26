@@ -114,6 +114,12 @@ public class ExportCFG extends HeadlessScript {
 	                    	call_successors.add(new Pair<>(dst, inst.getAddress()));
 	                    }
                     }
+                    if (ft != null && ft.isComputed()) {
+	                    for (Address dst : inst.getFlows()) {
+	                    	if (getFunctionAt(dst) != null)
+	                    		call_successors.add(new Pair<>(dst, inst.getAddress()));
+	                    }
+                    }
                 }
                 pout.format("      ],\n");
 
@@ -125,12 +131,17 @@ public class ExportCFG extends HeadlessScript {
                     if (succ_ref.getFlowType().isCall())
                         continue;
 
+                    CodeBlock succ = succ_ref.getDestinationBlock();
+                    Address dst = succ.getFirstStartAddress();
+                    if (succ_ref.getFlowType().isComputed() && getFunctionAt(dst) != null)
+                    	// It is a call
+                    	continue;
+
                     if (!first_iter_insts)
                         pout.format(",\n");
                     else
                         first_iter_insts = false;
-
-                    CodeBlock succ = succ_ref.getDestinationBlock();
+                    
                     if (!visited.contains(succ) && succ != null)
                         stack.push(succ);
                     pout.format("        \"%#x\"", succ.getFirstStartAddress().getOffset());
