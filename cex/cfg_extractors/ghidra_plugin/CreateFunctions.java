@@ -79,5 +79,7 @@ public class CreateFunctions extends HeadlessScript {
 		} catch (IOException e) {
 			System.err.println(path + " is not a valid filename");
 		}
+
+		analyzeChanges(currentProgram);
 	}
 }

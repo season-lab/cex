@@ -119,7 +119,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         super().__init__()
         self.data = dict()
 
-        self.use_accurate = True
+        self.use_accurate = False
 
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
@@ -262,24 +262,38 @@ class GhidraCfgExtractor(ICfgExtractor):
         self._load_cfg_raw(binary)
 
         if self.data[binary].cg is None:
-            cg = nx.DiGraph()
+            cg = nx.MultiDiGraph()
             for fun_raw in self.data[binary].cfg_raw:
                 fun_addr = int(fun_raw["addr"], 16)
                 fun_name = fun_raw["name"]
-                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name))
+                is_returning = True if fun_raw["is_returning"] == "true" else False
+                for block_raw in fun_raw["blocks"]:
+                    for call_raw in block_raw["calls"]:
+                        if call_raw["type"] == "external":
+                            name     = call_raw["name"]
+                            callsite = int(call_raw["callsite"], 16)
+                            if fun_addr not in self.data[binary].ext_calls:
+                                self.data[binary].ext_calls[fun_addr] = list()
+                            self.data[binary].ext_calls[fun_addr].append(ExtCallInfo(fun_addr, name, callsite))
+
+                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name, is_returning=is_returning))
 
             for fun_raw in self.data[binary].cfg_raw:
                 src = int(fun_raw["addr"], 16)
                 for block_raw in fun_raw["blocks"]:
                     for call_raw in block_raw["calls"]:
-                        dst = int(call_raw, 16)
+                        if call_raw["type"] == "external":
+                            continue
+
+                        dst      = int(call_raw["offset"], 16)
+                        callsite = int(call_raw["callsite"], 16)
                         if src not in cg.nodes:
                             sys.stderr.write("WARNING: %#x (src) not in nodes\n" % src)
                             continue
                         if dst not in cg.nodes:
                             sys.stderr.write("WARNING: %#x (dst) not in nodes\n" % dst)
                             continue
-                        cg.add_edge(src, dst)
+                        cg.add_edge(src, dst, callsite=callsite)
             self.data[binary].cg = cg
 
         # Ignore entry, the caller is in charge of pruning the CG
@@ -359,7 +373,11 @@ class GhidraCfgExtractor(ICfgExtractor):
             insns = list()
             for insn in block_raw["instructions"]:
                 insns.append(CFGInstruction(addr=int(insn["addr"], 16), size=int(insn["size"]), call_refs=list(), mnemonic=insn["mnemonic"]))
-            calls = list(map(lambda x: int(x, 16), block_raw["calls"]))
+            calls = list()
+            for c in block_raw["calls"]:
+                if c["type"] == "external":
+                    continue
+                calls.append(int(c["offset"], 16))
 
             if len(calls) > 0:
                 insns[-1].call_refs = calls

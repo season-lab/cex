@@ -18,6 +18,9 @@ import java.io.FileOutputStream;
 
 import java.util.Iterator;
 import java.util.Stack;
+
+import generic.stl.Pair;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -48,6 +51,15 @@ public class ExportCFG extends HeadlessScript {
         SimpleBlockModel model = new SimpleBlockModel(currentProgram);
 
         Listing listing = currentProgram.getListing();
+
+        HashSet<Long> external_functions = new HashSet<>();
+        FunctionIterator iter_ext_functions = listing.getExternalFunctions();
+        while (iter_ext_functions.hasNext() && !monitor.isCancelled()) {
+            Function f = iter_ext_functions.next();
+            for (Address a : f.getFunctionThunkAddresses())
+                external_functions.add(a.getOffset());
+        }
+
         FunctionIterator iter_functions = listing.getFunctions(true);
 
         boolean first_iter_functions = true;
@@ -66,6 +78,7 @@ public class ExportCFG extends HeadlessScript {
             pout.format(" {\n");
             pout.format("  \"name\": \"%s\",\n", f.getName());
             pout.format("  \"addr\": \"%#x\",\n", f.getEntryPoint().getOffset());
+            pout.format("  \"is_returning\" : \"%s\",\n", f.hasNoReturn() ? "false" : "true");
             pout.format("  \"blocks\": [\n");
             CodeBlock entry_block  = model.getCodeBlockAt(f.getEntryPoint(), monitor);
             if (entry_block == null) {
@@ -81,6 +94,8 @@ public class ExportCFG extends HeadlessScript {
                 CodeBlock block = stack.pop();
                 visited.add(block);
 
+                Set<Pair<Address, Address>> call_successors = new HashSet<>();
+
                 pout.format("    {\n");
                 pout.format("      \"addr\" : \"%#x\",\n", block.getFirstStartAddress().getOffset());
                 pout.format("      \"instructions\" : [\n", block.getFirstStartAddress().getOffset());
@@ -92,19 +107,23 @@ public class ExportCFG extends HeadlessScript {
                         pout.format(",\n");
                     else
                         pout.format("\n");
+
+                    FlowType ft = inst.getFlowType();
+                    if (ft != null && ft.isCall()) {
+	                    for (Address dst : inst.getFlows()) {
+	                    	call_successors.add(new Pair<>(dst, inst.getAddress()));
+	                    }
+                    }
                 }
                 pout.format("      ],\n");
 
                 pout.format("      \"successors\" : [\n");
                 boolean first_iter_insts = true;
-                Set<Long> call_successors = new HashSet<>();
-                CodeBlockReferenceIterator succ_iter = block.getDestinations​(monitor);
+                CodeBlockReferenceIterator succ_iter = block.getDestinations(monitor);
                 while (succ_iter.hasNext()) {
                     CodeBlockReference succ_ref = succ_iter.next();
-                    if (succ_ref.getFlowType().isCall()) {
-                        call_successors.add(succ_ref.getDestinationAddress().getOffset());
+                    if (succ_ref.getFlowType().isCall())
                         continue;
-                    }
 
                     if (!first_iter_insts)
                         pout.format(",\n");
@@ -120,10 +139,19 @@ public class ExportCFG extends HeadlessScript {
                 pout.format("      ],\n");
 
                 pout.format("      \"calls\" : [\n");
-                Iterator<Long> calls = call_successors.iterator();
+                Iterator<Pair<Address, Address>> calls = call_successors.iterator();
                 while(calls.hasNext()) {
-                    Long call = calls.next();
-                    pout.format("        \"%#x\"", call);
+                    Pair<Address, Address> call = calls.next();
+                    if (external_functions.contains(call.first.getOffset())) {
+                    	Function ext_f = getFunctionAt(call.first);
+                    	if (ext_f != null) {
+                    		pout.format("        { \"name\": \"%s\", \"callsite\" : \"%#x\", \"type\" : \"external\" }",
+    								ext_f.getName(), call.second.getOffset());
+                    	}
+                    } else {
+                    	pout.format("        { \"offset\": \"%#x\", \"callsite\" : \"%#x\", \"type\" : \"normal\" }",
+                    			call.first.getOffset(), call.second.getOffset());
+                    }
                     if (calls.hasNext())
                         pout.format(",\n");
                     else
