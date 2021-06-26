@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.lang.Thread;
 
 import ghidra.app.util.headless.HeadlessScript;
 import ghidra.program.model.listing.*;
@@ -30,7 +31,7 @@ public class CreateFunctions extends HeadlessScript {
 		currentProgram.getProgramContext().setRegisterValue(min, max, tmode_active);
 	}
 
-	private void createIfMissing(Address addr) throws Exception {
+	private boolean createIfMissing(Address addr) throws Exception {
 		boolean is_thumb = false;
 		if (isARM() && (addr.getOffset() % 2 == 1)) {
 			addr = addr.subtract(1);
@@ -39,7 +40,7 @@ public class CreateFunctions extends HeadlessScript {
 
 		Function f = getFunctionAt(addr);
 		if (f != null)
-			return;
+			return false;
 
 		f = createFunction(addr, null);
 		if (f == null)
@@ -47,10 +48,12 @@ public class CreateFunctions extends HeadlessScript {
 			f = createFunction(addr, null);
 
 		if (f == null)
-			throw new RuntimeException("Unable to create function @ " + addr);
+			return false;
 
 		if (is_thumb)
 			setThumb(f);
+		// disassemble(addr);
+		return true;
 	}
 
 	public void run() throws Exception {
@@ -63,6 +66,7 @@ public class CreateFunctions extends HeadlessScript {
 		lang = currentProgram.getLanguage();
 		AddressSpace as = lang.getDefaultSpace();
 
+		boolean at_least_one_new = false;
 		String path = args[0];
 		BufferedReader reader;
 		try {
@@ -70,7 +74,8 @@ public class CreateFunctions extends HeadlessScript {
 			String line = reader.readLine();
 			while (line != null) {
 				Long addr = Long.parseLong(line.strip().substring(2), 16);
-				createIfMissing(as.getAddress(addr));
+				if (createIfMissing(as.getAddress(addr)))
+					at_least_one_new = true;
 
 				// read next line
 				line = reader.readLine();
@@ -80,6 +85,10 @@ public class CreateFunctions extends HeadlessScript {
 			System.err.println(path + " is not a valid filename");
 		}
 
-		analyzeChanges(currentProgram);
+		// analyzeChanges(currentProgram);
+		if (at_least_one_new)
+			printf("[OUT] OK\n");
+		else
+			printf("[OUT] KO\n");
 	}
 }

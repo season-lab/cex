@@ -256,7 +256,10 @@ class GhidraCfgExtractor(ICfgExtractor):
                 fout.write("%#x\n" % off)
 
         cmd = self._get_cmd_custom_functions(binary, infile)
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        if b"[OUT] OK" in out:
+            # at least one function is new
+            self._clear_cg_cfg_cache_for_binary(binary)
 
     def get_cfg_callgraph(self, binary, entry=None):
         self._load_cfg_raw(binary)
@@ -393,3 +396,24 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     def clear_cache(self):
         self.data = dict()
+
+    def _clear_cg_cfg_cache_for_binary(self, binary):
+        if binary not in self.data:
+            self.data[binary] = GhidraBinaryData()
+
+        self.data[binary].cfg_raw   = None
+        self.data[binary].cg_raw    = None
+        self.data[binary].cg        = None
+        self.data[binary].acc_cg    = None
+        self.data[binary].ext_calls = dict()
+
+        binary_md5    = get_md5_file(binary)
+        cg_json_name  = "ghidra_cg_" + binary_md5  + ".json"
+        cg_json_path  = os.path.join(self.get_tmp_folder(), cg_json_name)
+        cfg_json_name = "ghidra_cfg_" + binary_md5  + ".json"
+        cfg_json_path = os.path.join(self.get_tmp_folder(), cfg_json_name)
+
+        if os.path.exists(cg_json_path):
+            os.remove(cg_json_path)
+        if os.path.exists(cfg_json_path):
+            os.remove(cfg_json_path)
