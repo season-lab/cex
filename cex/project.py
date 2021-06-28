@@ -191,10 +191,15 @@ class CEXProject(object):
             cfg = explode_cfg(cfg)
 
             for addr in cfg.nodes:
+                if "data" not in cfg.nodes[addr]:
+                    # TODO: this should not happen
+                    continue
                 bb = cfg.nodes[addr]["data"]
                 res_g.add_node(addr, data=bb)
 
             for src, dst in cfg.edges:
+                if src not in res_g.nodes or dst not in res_g.nodes:
+                    continue
                 res_g.add_edge(src, dst)
 
             return cfg
