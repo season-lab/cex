@@ -135,6 +135,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                     callsite -= callsite % 2
 
                 dst = fun_src.get_call_target(block_with_call_addr)
+                if dst is None:
+                    continue
                 fun_dst = proj.kb.functions[dst]
                 if fun_dst.is_simprocedure:
                     continue
