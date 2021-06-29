@@ -270,7 +270,12 @@ class GhidraCfgExtractor(ICfgExtractor):
                 fun_addr = int(fun_raw["addr"], 16)
                 fun_name = fun_raw["name"]
                 is_returning = True if fun_raw["is_returning"] == "true" else False
+
+                last_instr = fun_addr
                 for block_raw in fun_raw["blocks"]:
+                    for instr_raw in block_raw["instructions"]:
+                        if int(instr_raw["addr"], 16) > last_instr:
+                            last_instr = int(instr_raw["addr"], 16)
                     for call_raw in block_raw["calls"]:
                         if call_raw["type"] == "external":
                             name     = call_raw["name"]
@@ -279,7 +284,10 @@ class GhidraCfgExtractor(ICfgExtractor):
                                 self.data[binary].ext_calls[fun_addr] = list()
                             self.data[binary].ext_calls[fun_addr].append(ExtCallInfo(fun_addr, name, callsite))
 
-                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name, is_returning=is_returning))
+                ret_sites = list(map(lambda r: int(r, 16), fun_raw["return_sites"]))
+                if is_returning and len(ret_sites) == 0:
+                    ret_sites = [last_instr]
+                cg.add_node(fun_addr, data=CGNodeData(addr=fun_addr, name=fun_name, is_returning=is_returning, return_sites=ret_sites))
 
             for fun_raw in self.data[binary].cfg_raw:
                 src = int(fun_raw["addr"], 16)

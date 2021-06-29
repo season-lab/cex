@@ -82,10 +82,13 @@ public class ExportCFG extends HeadlessScript {
             pout.format("  \"blocks\": [\n");
             CodeBlock entry_block  = model.getCodeBlockAt(f.getEntryPoint(), monitor);
             if (entry_block == null) {
+                pout.format("  ],\n");
+                pout.format("  \"return_sites\" : [\n");
                 pout.format("  ]\n");
                 continue;
             }
 
+            Set<Address> ret_sites = new HashSet<>();
             Stack<CodeBlock> stack = new Stack<>();
             Set<CodeBlock> visited = new HashSet<>();
             stack.push(entry_block);
@@ -102,6 +105,10 @@ public class ExportCFG extends HeadlessScript {
                 InstructionIterator iter = currentProgram.getListing().getInstructions(block, true);
                 while (iter.hasNext()) {
                     Instruction inst = iter.next();
+                    for (PcodeOp op : inst.getPcode())
+                        if (op.getOpcode() == PcodeOp.RETURN)
+                            ret_sites.add(inst.getAddress());
+
                     pout.format("        { \"addr\": \"%#x\", \"size\": %d, \"mnemonic\" : \"%s\" }", inst.getAddress().getOffset(), inst.getLength(), inst.toString());
                     if (iter.hasNext())
                         pout.format(",\n");
@@ -175,7 +182,18 @@ public class ExportCFG extends HeadlessScript {
                 else
                     pout.format("    },\n");
             }
-            pout.format("  ]\n");
+            pout.format("  ],\n");
+
+            boolean need_comma = false;
+            pout.format("  \"return_sites\" : [\n");
+            for (Address r : ret_sites) {
+                if (need_comma)
+                    pout.format(",\n");
+                else
+                    need_comma = true;
+                pout.format("    \"%#x\"", r.getOffset());
+            }
+            pout.format("\n  ]\n");
         }
         if (!first_iter_functions)
             pout.format(" }\n");
