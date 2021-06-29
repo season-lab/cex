@@ -291,6 +291,11 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             for fun_raw in self.data[binary].cfg_raw:
                 src = int(fun_raw["addr"], 16)
+                if fun_raw["name"] == "operator.new":
+                    # AngrEmulated has "new" model, so its callgraph does not have
+                    # the successors of this node. Let's skip it for consistency
+                    continue
+
                 for block_raw in fun_raw["blocks"]:
                     for call_raw in block_raw["calls"]:
                         if call_raw["type"] == "external":
