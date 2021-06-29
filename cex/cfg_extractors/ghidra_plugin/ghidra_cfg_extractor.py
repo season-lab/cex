@@ -383,6 +383,8 @@ class GhidraCfgExtractor(ICfgExtractor):
         if target_fun is None:
             return nx.DiGraph()
 
+        is_thumb = target_fun["is_thumb"]
+
         cfg = nx.DiGraph()
         for block_raw in target_fun["blocks"]:
             addr  = int(block_raw["addr"], 16)
@@ -397,7 +399,7 @@ class GhidraCfgExtractor(ICfgExtractor):
 
             if len(calls) > 0:
                 insns[-1].call_refs = calls
-            cfg.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
+            cfg.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls, is_thumb=is_thumb))
 
         for block_raw in target_fun["blocks"]:
             src = int(block_raw["addr"], 16)

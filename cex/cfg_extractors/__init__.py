@@ -33,10 +33,11 @@ class CFGInstruction(object):
 
 
 class CFGNodeData(object):
-    def __init__(self, addr: int, insns: list, calls: list):
+    def __init__(self, addr: int, insns: list, calls: list, is_thumb=False):
         self.addr  = addr
         self.insns = insns
         self.calls = calls
+        self.is_thumb = is_thumb
 
     def get_dot_label(self):
         return "\l".join(map(str, self.insns)) + "\l"
@@ -53,7 +54,7 @@ class CFGNodeData(object):
     def join(self, other):
         " Append other instructions to self "
         assert isinstance(other, CFGNodeData)
-        return CFGNodeData(self.addr, self.insns + other.insns, self.calls + other.calls)
+        return CFGNodeData(self.addr, self.insns + other.insns, self.calls + other.calls, is_thumb=self.is_thumb or other.is_thumb)
 
     def merge(self, other):
         """

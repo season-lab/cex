@@ -16,6 +16,7 @@ import java.io.PrintWriter;
 import java.io.PrintStream;
 import java.io.FileOutputStream;
 
+import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Stack;
 
@@ -25,6 +26,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ExportCFG extends HeadlessScript {
+    boolean is_arm;
+
+    private boolean isThumb(Function f) {
+        if (!is_arm)
+            return false;
+
+		Register tmode_r = currentProgram.getRegister("TMode");
+		if (currentProgram.getProgramContext().getRegisterValue(tmode_r, f.getEntryPoint()).getUnsignedValueIgnoreMask().compareTo(BigInteger.ONE) == 0)
+			return true;
+        return false;
+    }
 
     public void run() throws Exception {
 
@@ -36,6 +48,8 @@ public class ExportCFG extends HeadlessScript {
         } else {
             path = args[0];
         }
+
+        is_arm = currentProgram.getLanguage().getProcessor().toString().equals("ARM");
 
         printf("[DEBUG] Output file: %s\n", path); // DEBUG
         FileOutputStream fout;
@@ -79,6 +93,7 @@ public class ExportCFG extends HeadlessScript {
             pout.format("  \"name\": \"%s\",\n", f.getName());
             pout.format("  \"addr\": \"%#x\",\n", f.getEntryPoint().getOffset());
             pout.format("  \"is_returning\" : \"%s\",\n", f.hasNoReturn() ? "false" : "true");
+            pout.format("  \"is_thumb\" : \"%s\",\n", isThumb(f) ? "true" : "false");
             pout.format("  \"blocks\": [\n");
             CodeBlock entry_block  = model.getCodeBlockAt(f.getEntryPoint(), monitor);
             if (entry_block == null) {
