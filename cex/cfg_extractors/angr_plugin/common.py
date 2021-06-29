@@ -19,6 +19,8 @@ class AngrBinaryData(object):
 
 
 class AngrCfgExtractor(ICfgExtractor):
+    is_thumb_cache = dict()
+
     def __init__(self):
         super().__init__()
 
@@ -35,23 +37,32 @@ class AngrCfgExtractor(ICfgExtractor):
 
         assert addr % 2 == 0
 
+        if proj.filename not in AngrCfgExtractor.is_thumb_cache:
+            AngrCfgExtractor.is_thumb_cache[proj.filename] = dict()
+        if addr in AngrCfgExtractor.is_thumb_cache[proj.filename]:
+            return AngrCfgExtractor.is_thumb_cache[proj.filename][addr]
+
         # Heuristic 1: check if the lifted block is empty
-        s = proj.factory.blank_state()
-        s.ip = addr
-        if s.block().size == 0:
+        b = proj.factory.block(addr)
+        if b.size == 0:
+            AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = True
             return True
 
         # Heuristic 2: check number of instructions with capstone
-        if len(s.block().capstone.insns) == 0:
+        if len(b.capstone.insns) == 0:
+            AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = True
             return True
 
         # Heuristic 3: check symbols
         for s in proj.loader.symbols:
             if s.rebased_addr == addr + 1:
+                AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = True
                 return True
             elif s.rebased_addr == addr:
+                AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = False
                 return False
 
+        AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = False
         return False
 
     @staticmethod
