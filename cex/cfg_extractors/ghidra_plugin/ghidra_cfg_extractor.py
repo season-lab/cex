@@ -373,6 +373,7 @@ class GhidraCfgExtractor(ICfgExtractor):
 
     def get_cfg(self, binary, addr):
         self._load_cfg_raw(binary)
+        orig_addr = addr
 
         target_fun = None
         for fun_raw in self.data[binary].cfg_raw:
@@ -409,7 +410,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                     continue
                 cfg.add_edge(src, dst)
 
-        return self.normalize_graph(cfg)
+        return self.normalize_graph(orig_addr, cfg)
 
     def clear_cache(self):
         self.data = dict()

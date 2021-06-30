@@ -175,7 +175,7 @@ class CEXProject(object):
             addr = addr - b.addr + 0x400000
 
         graphs = list(map(lambda p: p.get_cfg(b.path, addr), self.non_multilib_plugins if no_multilib else self.plugins))
-        merged = merge_cfgs(*graphs)
+        merged = merge_cfgs(addr, *graphs)
         if merged is None:
             return None
         merged = self._fix_addresses(merged, b)
@@ -289,14 +289,14 @@ class CEXProject(object):
             other_paths = list(map(lambda l: l.path, filter(lambda bb: bb.hash != b.hash, [self.bin] + self.libs)))
             if b is not None:
                 graphs = list(map(lambda p: p.get_icfg(b.path, other_paths, entry, self._addresses), self.multilib_plugins))
-                res_g  = merge_cfgs(res_g, *graphs)
+                res_g  = merge_cfgs(entry, res_g, *graphs)
 
         if entry not in res_g.nodes:
             # Strange...
             return nx.DiGraph()
 
         res_g = res_g.subgraph(nx.dfs_postorder_nodes(res_g, entry)).copy()
-        return normalize_graph(res_g)
+        return normalize_graph(entry, res_g)
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:

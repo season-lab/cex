@@ -25,16 +25,24 @@ def explode_cfg(g):
         res_g.add_edge(src_id, dst_id)
     return res_g
 
-def normalize_graph(graph, merge_calls=False):
+def normalize_graph(entry, graph, merge_calls=False):
     """ 
         Merge nodes n1 and n2 if:
             - n1 is the only (direct) predecessor of n2
             - n2 is the only (direct) successor of n1
             - the last instruction of n1 is not a call (only if merge_calls is False)
     """
+
+    assert entry is not None
+
+    entry_for_merged = set([entry])
     merged_nodes = dict()
     out_graph    = nx.DiGraph()
-    for n_id in graph.nodes:
+
+    if entry not in graph.nodes:
+        return out_graph
+
+    for n_id in nx.dfs_preorder_nodes(graph, entry):
         if n_id in merged_nodes:
             continue
 
@@ -51,6 +59,9 @@ def normalize_graph(graph, merge_calls=False):
             if len(predecessors) != 1:
                 break
 
+            if unique_successor_id in entry_for_merged:
+                break
+
             assert predecessors[0] == n_id
             if not merge_calls and hasattr(node_data, "insns") and \
                     len(node_data.insns[-1].call_refs) > 0:
@@ -58,6 +69,7 @@ def normalize_graph(graph, merge_calls=False):
 
             unique_successor_data = graph.nodes[unique_successor_id]["data"]
             merged_nodes[unique_successor_id] = orig_n_id
+            entry_for_merged.add(orig_n_id)
             merged_node_data = merged_node_data.join(unique_successor_data)
             n_id = unique_successor_id
 
@@ -70,17 +82,24 @@ def normalize_graph(graph, merge_calls=False):
         if src_id in merged_nodes:
             # this is an edge from the n2 to its successors, I want to preserve those edges. Keep them!
             src_id = merged_nodes[src_id]
+
         out_graph.add_edge(src_id, dst_id)
 
     return out_graph
 
-def merge_cfgs(*graphs):
+def merge_cfgs(entry, *graphs):
+    if len(graphs) == 0:
+        return nx.DiGraph()
     if len(graphs) == 1:
+        return graphs[0]
+    if len(graphs) == 2 and len(graphs[0].nodes) == 0:
+        return graphs[1]
+    if len(graphs) == 2 and len(graphs[1].nodes) == 0:
         return graphs[0]
 
     exploded_graphs = list(map(explode_cfg, graphs))
     merged          = merge_digraphs(*exploded_graphs)
-    return normalize_graph(merged)
+    return normalize_graph(entry, merged)
 
 
 def merge_digraphs(*graphs):

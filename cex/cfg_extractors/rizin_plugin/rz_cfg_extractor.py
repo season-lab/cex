@@ -184,7 +184,7 @@ class RZCfgExtractor(ICfgExtractor):
                 continue
             g.add_edge(src, dst)
 
-        self.cache[binary].cfg[addr] = self.normalize_graph(g)
+        self.cache[binary].cfg[addr] = self.normalize_graph(addr, g)
         rz.quit()
 
         return self.cache[binary].cfg[addr]

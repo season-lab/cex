@@ -76,7 +76,7 @@ class CFGNodeData(object):
 
         res = list()
         for insn in self.insns:
-            res.append(CFGNodeData(insn.addr, [insn], insn.call_refs))
+            res.append(CFGNodeData(insn.addr, [insn], insn.call_refs, self.is_thumb))
         return res
 
     def __str__(self):
@@ -122,8 +122,8 @@ class ICfgExtractor(IPlugin):
         return "/dev/shm/cex_projects"
 
     @staticmethod
-    def normalize_graph(graph):
-        return normalize_graph(graph)
+    def normalize_graph(entry, graph):
+        return normalize_graph(entry, graph)
 
     def clear_cache(self):
         return  # Look in subclasses
