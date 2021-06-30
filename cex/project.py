@@ -255,7 +255,8 @@ class CEXProject(object):
                 # Most probably an inaccuracy of the original CFG (I debugged a case in angr)
                 continue
 
-            assert addr_dst in res_g.nodes
+            if addr_dst not in res_g.nodes:
+                continue
             res_g.add_edge(callsite, addr_dst)
 
             # Easy edge
@@ -290,8 +291,12 @@ class CEXProject(object):
                 graphs = list(map(lambda p: p.get_icfg(b.path, other_paths, entry, self._addresses), self.multilib_plugins))
                 res_g  = merge_cfgs(res_g, *graphs)
 
-        g = normalize_graph(res_g)
-        return g.subgraph(nx.dfs_postorder_nodes(g, entry)).copy()
+        if entry not in res_g.nodes:
+            # Strange...
+            return nx.DiGraph()
+
+        res_g = res_g.subgraph(nx.dfs_postorder_nodes(res_g, entry)).copy()
+        return normalize_graph(res_g)
 
     def get_depgraph(self):
         if self._lib_dep_graph is not None:

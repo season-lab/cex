@@ -405,6 +405,8 @@ class GhidraCfgExtractor(ICfgExtractor):
             src = int(block_raw["addr"], 16)
             for dst_raw in block_raw["successors"]:
                 dst = int(dst_raw, 16)
+                if src not in cfg.nodes or dst not in cfg.nodes:
+                    continue
                 cfg.add_edge(src, dst)
 
         return self.normalize_graph(cfg)

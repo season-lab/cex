@@ -203,7 +203,10 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             if node.block is None:
                 return
 
-            capstone_insns = node.block.capstone.insns
+            try:
+                capstone_insns = node.block.capstone.insns
+            except KeyError:
+                capstone_insns = list()
             for insn in capstone_insns:
                 mnemonic = str(insn).split(":")[1].strip().replace("\t", "  ")
                 addr = insn.insn.address

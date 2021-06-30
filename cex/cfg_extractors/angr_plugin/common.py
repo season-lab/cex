@@ -43,7 +43,10 @@ class AngrCfgExtractor(ICfgExtractor):
             return AngrCfgExtractor.is_thumb_cache[proj.filename][addr]
 
         # Heuristic 1: check if the lifted block is empty
-        b = proj.factory.block(addr)
+        try:
+            b = proj.factory.block(addr)
+        except:
+            return True
         if b.size == 0:
             AngrCfgExtractor.is_thumb_cache[proj.filename][addr] = True
             return True
@@ -146,7 +149,7 @@ class AngrCfgExtractor(ICfgExtractor):
                         callsite -= callsite % 2
 
                     dst = fun_src.get_call_target(block_with_call_addr)
-                    if dst not in self.data[binary].proj.kb.functions:
+                    if dst is None or dst not in self.data[binary].proj.kb.functions:
                         continue
                     fun_dst = self.data[binary].proj.kb.functions[dst]
                     if is_arm:
