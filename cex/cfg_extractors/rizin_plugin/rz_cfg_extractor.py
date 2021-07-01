@@ -114,6 +114,7 @@ class RZCfgExtractor(ICfgExtractor):
         return cg
 
     def get_cfg(self, binary, addr):
+        orig_addr = addr
         self.faddr_cache = dict()
 
         if binary not in self.cache:
@@ -191,7 +192,7 @@ class RZCfgExtractor(ICfgExtractor):
                 continue
             g.add_edge(src, dst)
 
-        self.cache[binary].cfg[addr] = self.normalize_graph(addr, g)
+        self.cache[binary].cfg[addr] = self.normalize_graph(orig_addr, g)
         rz.quit()
 
         return self.cache[binary].cfg[addr]
