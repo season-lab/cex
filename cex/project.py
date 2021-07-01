@@ -287,7 +287,7 @@ class CEXProject(object):
         if use_multilib_icfg:
             # Dont reconstruct the CFG of every single function, but use the
             # ICFG at entrypoint. This is more scalable but less precise
-            b = self.bin if addr is None else self.get_bin_containing(addr)
+            b = self.bin if entry is None else self.get_bin_containing(entry)
             other_paths = list(map(lambda l: l.path, filter(lambda bb: bb.hash != b.hash, [self.bin] + self.libs)))
             if b is not None:
                 graphs = list(map(lambda p: p.get_icfg(b.path, other_paths, entry, self._addresses), self.multilib_plugins))
