@@ -384,7 +384,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         if target_fun is None:
             return nx.DiGraph()
 
-        is_thumb = target_fun["is_thumb"]
+        is_thumb = True if target_fun["is_thumb"] == "true" else False
 
         cfg = nx.DiGraph()
         for block_raw in target_fun["blocks"]:
