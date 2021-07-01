@@ -81,6 +81,15 @@ class RZCfgExtractor(ICfgExtractor):
             functions = rz.cmdj("aflj")
             cg        = nx.MultiDiGraph()
 
+            def collect_ret_sites(a):
+                res = list()
+                cfg = rz.cmdj("agj @ %#x" % a)[0]
+                for block in cfg["blocks"]:
+                    for insn in block["ops"]:
+                        if insn["type"] == "ret":
+                            res.append(insn["offset"])
+                return res
+
             for fun in functions:
                 addr = fun["offset"]
                 name = fun["name"]
@@ -103,7 +112,12 @@ class RZCfgExtractor(ICfgExtractor):
                             sys.stderr.write("WARNING: %#x not in nodes (dst)\n" % dst)
                             continue
                         # External function. Add to CG
-                        cg.add_node(dst, data=CGNodeData(addr=dst, name=symb_name))
+                        is_returning = not src_raw["noreturn"]
+                        if is_returning:
+                            ret_sites = collect_ret_sites(src)
+                        else:
+                            ret_sites = list()
+                        cg.add_node(dst, data=CGNodeData(addr=dst, name=symb_name, is_returning=is_returning, return_sites=ret_sites))
                     cg.add_edge(src, dst, callsite=callsite)
 
             self.cache[binary].cg = cg
