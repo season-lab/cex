@@ -183,9 +183,11 @@ class AngrCfgExtractor(ICfgExtractor):
     def _build_cfg(self, binary, addr):
         self._build_angr_cfg_cg(binary, addr)
 
+        is_thumb = False
         addr_angr = addr
         if addr % 2 == 0 and AngrCfgExtractor.is_thumb(self.data[binary].proj, addr):
             addr_angr += 1
+            is_thumb = True
 
         if addr_angr not in self.data[binary].proj.kb.functions:
             raise FunctionNotFoundException(addr)
@@ -236,7 +238,8 @@ class AngrCfgExtractor(ICfgExtractor):
                 g.add_node(addr, data=CFGNodeData(
                     addr=addr,
                     insns=insns,
-                    calls=calls))
+                    calls=calls,
+                    is_thumb=is_thumb))
 
             for node in fun.graph.nodes:
                 add_node(node)

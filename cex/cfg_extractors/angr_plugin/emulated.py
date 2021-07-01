@@ -219,14 +219,17 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             if len(calls) > 0:
                 insns[-1].call_refs = calls
 
+            is_thumb = False
             addr = node.addr
             if is_arm:
-                addr -= addr % 2
+                is_thumb = addr % 2 == 1
+                addr    -= addr % 2
 
             g.add_node(addr, data=CFGNodeData(
                 addr=addr,
                 insns=insns,
-                calls=calls))
+                calls=calls,
+                is_thumb=is_thumb))
 
         for node in cfg.graph.nodes:
             add_node(node)

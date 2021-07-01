@@ -123,6 +123,11 @@ class RZCfgExtractor(ICfgExtractor):
             return self.cache[binary].cfg[addr]
 
         rz  = self._open_rz(binary)
+
+        is_arm = rz.cmdj("iIj")["arch"] == "arm"
+        def is_thumb_check(insn):
+            return is_arm and insn["size"] == 2
+
         cfg = rz.cmdj("agj @ %#x" % addr)[0]
         g   = nx.DiGraph()
 
@@ -130,6 +135,7 @@ class RZCfgExtractor(ICfgExtractor):
         for block in cfg["blocks"]:
             addr = block["offset"]
 
+            is_thumb      = False
             insns         = list()
             ops_with_call = list()
             for i, op in enumerate(block["ops"]):
@@ -143,6 +149,7 @@ class RZCfgExtractor(ICfgExtractor):
                 disasm = "???"
                 if "disasm" in op:
                     disasm = op["disasm"]
+                is_thumb = is_thumb_check(op)
                 insns.append(CFGInstruction(addr=op["offset"], size=op["size"], call_refs=call_refs, mnemonic=disasm))
 
             if len(ops_with_call) > 0 and RZCfgExtractor.SPLIT_BLOCKS_AT_CALLS:
@@ -153,7 +160,7 @@ class RZCfgExtractor(ICfgExtractor):
                     insns_slice = insns[prev_op:next_op]
                     calls       = call_targets
 
-                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=calls))
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=calls, is_thumb=is_thumb))
                     if next_op < len(block["ops"]):
                         addr = block["ops"][next_op]["offset"]
                         edges.append((op_addr, addr))
@@ -162,11 +169,11 @@ class RZCfgExtractor(ICfgExtractor):
                 if next_op < len(insns):
                     op_addr     = addr
                     insns_slice = insns[next_op:]
-                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=list()))
+                    g.add_node(op_addr, data=CFGNodeData(addr=op_addr, insns=insns_slice, calls=list(), is_thumb=is_thumb))
 
             else:
                 calls = list(map(lambda x: x[1], ops_with_call))
-                g.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls))
+                g.add_node(addr, data=CFGNodeData(addr=addr, insns=insns, calls=calls, is_thumb=is_thumb))
 
             if "jump" in block:
                 dst = block["jump"]
