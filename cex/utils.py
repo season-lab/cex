@@ -62,6 +62,15 @@ def normalize_graph(entry, graph, merge_calls=False):
             if unique_successor_id in entry_for_merged:
                 break
 
+            if hasattr(node_data, "insns") and len(node_data.insns) > 0:
+                last_insn = node_data.insns[-1]
+                succ_data = graph.nodes[unique_successor_id]["data"]
+                if hasattr(succ_data, "insns") and len(succ_data.insns) > 0:
+                    first_insn_succ = succ_data.insns[0]
+                    if last_insn.addr + last_insn.size != first_insn_succ.addr:
+                        # Not a direct successor, avoid merging
+                        break
+
             assert predecessors[0] == n_id
             if not merge_calls and hasattr(node_data, "insns") and \
                     len(node_data.insns[-1].call_refs) > 0:
