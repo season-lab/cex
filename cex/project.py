@@ -278,8 +278,10 @@ class CEXProject(object):
 
             for retaddr in ret_addresses:
                 for ret_node in get_ret_nodes(addr_dst, cg, cfgs[addr_dst]):
-                    assert ret_node in res_g.nodes
-                    assert retaddr  in res_g.nodes
+                    if ret_node not in res_g.nodes:
+                        continue
+                    if retaddr not in res_g.nodes:
+                        continue
                     res_g.add_edge(ret_node, retaddr)
 
         if use_multilib_icfg:
