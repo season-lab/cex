@@ -78,6 +78,8 @@ class AngrCfgExtractor(ICfgExtractor):
         for s in proj.loader.symbols:
             if proj.is_hooked(s.rebased_addr):
                 h = proj.hooked_by(s.rebased_addr)
+                if h is None or h.cc is None:
+                    continue
                 fun_ty = h.cc.func_ty
                 if fun_ty is None:
                     continue
