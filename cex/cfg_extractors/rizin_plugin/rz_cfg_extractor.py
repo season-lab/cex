@@ -93,7 +93,13 @@ class RZCfgExtractor(ICfgExtractor):
             for fun in functions:
                 addr = fun["offset"]
                 name = fun["name"]
-                cg.add_node(addr, data=CGNodeData(addr=addr, name=name))
+                is_returning = not fun["noreturn"]
+                if is_returning:
+                    ret_sites = collect_ret_sites(addr)
+                else:
+                    ret_sites = list()
+
+                cg.add_node(addr, data=CGNodeData(addr=addr, name=name, is_returning=is_returning, return_sites=ret_sites))
 
             for src_raw in functions:
                 src = src_raw["offset"]
