@@ -142,7 +142,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 is_returning = fun_src.returning
                 ret_sites = list()
                 for r in fun_src.ret_sites:
-                    if r.size > 0:
+                    if r is not None and r.size > 0:
                         ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
 
                 if src not in g.nodes:
@@ -166,7 +166,7 @@ class AngrCfgExtractor(ICfgExtractor):
                     is_returning = fun_dst.returning
                     ret_sites = list()
                     for r in fun_dst.ret_sites:
-                        if r.size > 0:
+                        if r is not None and r.size > 0:
                             ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
 
                     if dst not in g.nodes:
@@ -190,7 +190,7 @@ class AngrCfgExtractor(ICfgExtractor):
                         is_returning = fun_dst.returning
                         ret_sites = list()
                         for r in fun_dst.ret_sites:
-                            if r.size > 0:
+                            if r is not None and r.size > 0:
                                 ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
 
                         if dst not in g.nodes:
