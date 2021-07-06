@@ -139,8 +139,14 @@ class AngrCfgExtractor(ICfgExtractor):
                 if is_arm:
                     src -= src % 2
 
+                is_returning = fun_src.returning
+                ret_sites = list()
+                for r in fun_src.ret_sites:
+                    if r.size > 0:
+                        ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+
                 if src not in g.nodes:
-                    g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name))
+                    g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name, is_returning=is_returning, return_sites=ret_sites))
 
                 for block_with_call_addr in fun_src.get_call_sites():
                     try:
@@ -157,8 +163,14 @@ class AngrCfgExtractor(ICfgExtractor):
                     if is_arm:
                         dst -= dst % 2
 
+                    is_returning = fun_dst.returning
+                    ret_sites = list()
+                    for r in fun_dst.ret_sites:
+                        if r.size > 0:
+                            ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+
                     if dst not in g.nodes:
-                        g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
+                        g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name, is_returning=is_returning, return_sites=ret_sites))
 
                     g.add_edge(src, dst, callsite=callsite)
 
@@ -175,8 +187,14 @@ class AngrCfgExtractor(ICfgExtractor):
                         if is_arm:
                             dst -= dst % 2
 
+                        is_returning = fun_dst.returning
+                        ret_sites = list()
+                        for r in fun_dst.ret_sites:
+                            if r.size > 0:
+                                ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+
                         if dst not in g.nodes:
-                            g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name))
+                            g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name, is_returning=is_returning, return_sites=ret_sites))
 
                         g.add_edge(src, dst, callsite=callsite)
 
