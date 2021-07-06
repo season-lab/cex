@@ -143,7 +143,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 ret_sites = list()
                 for r in fun_src.ret_sites:
                     if r is not None and r.size is not None and r.size > 0:
-                        ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+                        ret_sites.append(r.addr if not is_arm else (r.addr - r.addr % 2))
 
                 if src not in g.nodes:
                     g.add_node(src, data=CGNodeData(addr=src, name=fun_src.name, is_returning=is_returning, return_sites=ret_sites))
@@ -167,7 +167,7 @@ class AngrCfgExtractor(ICfgExtractor):
                     ret_sites = list()
                     for r in fun_dst.ret_sites:
                         if r is not None and r.size is not None and r.size > 0:
-                            ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+                            ret_sites.append(r.addr if not is_arm else (r.addr - r.addr % 2))
 
                     if dst not in g.nodes:
                         g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name, is_returning=is_returning, return_sites=ret_sites))
@@ -191,7 +191,7 @@ class AngrCfgExtractor(ICfgExtractor):
                         ret_sites = list()
                         for r in fun_dst.ret_sites:
                             if r is not None and r.size is not None and r.size > 0:
-                                ret_sites.append(r.addr if not is_arm else r.addr - r.addr % 2)
+                                ret_sites.append(r.addr if not is_arm else (r.addr - r.addr % 2))
 
                         if dst not in g.nodes:
                             g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name, is_returning=is_returning, return_sites=ret_sites))
@@ -210,7 +210,7 @@ class AngrCfgExtractor(ICfgExtractor):
             is_thumb = True
 
         if addr_angr not in self.data[binary].proj.kb.functions:
-            raise FunctionNotFoundException(addr)
+            return nx.DiGraph()
 
         if addr not in self.data[binary].cfg:
             is_arm = False

@@ -134,14 +134,15 @@ def merge_cgs(*graphs):
     if len(graphs) == 1:
         return graphs[0]
 
-    visited   = set()
     res_graph = nx.MultiDiGraph()
     for g in graphs:
         for n_id in g.nodes:
-            if n_id in visited:
-                continue
-            visited.add(n_id)
-            res_graph.add_node(n_id, data=g.nodes[n_id]["data"])
+            if n_id in res_graph.nodes:
+                old_data = res_graph.nodes[n_id]["data"]
+                new_data = g.nodes[n_id]["data"].merge(old_data)
+                res_graph.nodes[n_id]["data"] = new_data
+            else:
+                res_graph.add_node(n_id, data=g.nodes[n_id]["data"])
 
     for g in graphs:
         for src_id, dst_id, i in g.edges:

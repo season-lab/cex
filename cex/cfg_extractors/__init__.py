@@ -90,6 +90,14 @@ class CGNodeData(object):
         self.is_returning = is_returning
         self.return_sites = return_sites or list()
 
+    def merge(self, other):
+        assert self.addr == other.addr
+        return CGNodeData(
+            self.name,
+            self.addr,
+            self.is_returning or other.is_returning,
+            list(set(self.return_sites + other.return_sites)))
+
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
 
