@@ -25,6 +25,7 @@ class AngrCfgExtractor(ICfgExtractor):
         super().__init__()
 
         self.data = dict()
+        self.build_cfg = True
 
     @staticmethod
     def is_arm(proj):
@@ -108,6 +109,9 @@ class AngrCfgExtractor(ICfgExtractor):
 
     def _build_angr_cfg_cg(self, binary, addr):
         self._build_project(binary)
+
+        if not self.build_cfg:
+            return
 
         addr_angr = addr
         if addr % 2 == 0 and AngrCfgExtractor.is_thumb(self.data[binary].proj, addr):

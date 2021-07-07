@@ -54,6 +54,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         # We are accurate, but with an incomplete graph
         # NOTE: keep_state=True is necessary, otherwise
         #       SimProcedures are not called
+        print("Building accurate CFG @ %#x" % addr)
         try:
             cfg = proj.analyses.CFGEmulated(
                 fail_fast=True, keep_state=True, starts=[addr],
