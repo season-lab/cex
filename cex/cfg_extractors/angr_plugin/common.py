@@ -295,4 +295,7 @@ class AngrCfgExtractor(ICfgExtractor):
         if addr not in self.data[binary].cfg:
             self._build_cfg(binary, addr)
 
+        if addr not in self.data[binary].cfg:
+            return nx.DiGraph()
+
         return self.data[binary].cfg[addr]
