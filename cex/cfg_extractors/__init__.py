@@ -91,7 +91,7 @@ class CGNodeData(object):
         self.return_sites = return_sites or list()
 
     def merge(self, other):
-        assert self.addr == other.addr
+        # assert self.addr == other.addr
         return CGNodeData(
             self.name,
             self.addr,
