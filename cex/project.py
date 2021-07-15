@@ -3,7 +3,7 @@ import sys
 
 from .cfg_extractors import IMultilibCfgExtractor
 from .cex_plugin_manager import CexPluginManager
-from .utils import merge_cgs, merge_cfgs, fix_graph_addresses, explode_cfg, normalize_graph
+from .utils import merge_cgs, merge_cfgs, fix_graph_addresses, explode_cfg, normalize_graph, add_cg_edges
 from .bininfo import BinInfo
 
 def print_err(*msg):
@@ -59,7 +59,7 @@ class CEXProject(object):
             g = fix_graph_addresses(g, b.addr - 0x400000)
         return g
 
-    def get_callgraph(self, addr=None):
+    def get_callgraph(self, addr=None, additional_cg_edges=None):
         b = self.bin if addr is None else self.get_bin_containing(addr)
         if b is None:
             return None
@@ -70,6 +70,8 @@ class CEXProject(object):
             res    = merge_cgs(*graphs)
             res    = self._fix_addresses(res, b)
             if addr is not None:
+                if additional_cg_edges is not None:
+                    res = add_cg_edges(res, additional_cg_edges)
                 return res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
             return res
 
@@ -139,6 +141,8 @@ class CEXProject(object):
         graphs = list(map(lambda p: p.get_multi_callgraph(
             b.path, other_paths, addr, self._addresses), self.multilib_plugins))
         res = merge_cgs(*graphs)
+        if additional_cg_edges is not None:
+            res = add_cg_edges(res, additional_cg_edges)
 
         processed = set()
         stack     = [b]
@@ -154,6 +158,9 @@ class CEXProject(object):
 
             res = merge_cgs(res, g)
             res = add_depgraph_edges(res)
+            if additional_cg_edges is not None:
+                res = add_cg_edges(res, additional_cg_edges)
+
             if addr is not None:
                 res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
 
@@ -163,6 +170,8 @@ class CEXProject(object):
 
         res = add_depgraph_edges(res)
         if addr is not None:
+            if additional_cg_edges is not None:
+                res = add_cg_edges(res, additional_cg_edges)
             res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
         return res
 
@@ -181,8 +190,8 @@ class CEXProject(object):
         merged = self._fix_addresses(merged, b)
         return merged
 
-    def get_icfg(self, entry, use_multilib_icfg=True):
-        cg = self.get_callgraph(entry)
+    def get_icfg(self, entry, use_multilib_icfg=True, additional_cg_edges=None):
+        cg = self.get_callgraph(entry, additional_cg_edges)
 
         res_g = nx.DiGraph()
         def add_cfg(addr):

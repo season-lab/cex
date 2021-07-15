@@ -110,6 +110,11 @@ def merge_cfgs(entry, *graphs):
     merged          = merge_digraphs(*exploded_graphs)
     return normalize_graph(entry, merged)
 
+def add_cg_edges(g, edges):
+    for src, dst, callsite in edges:
+        if src in g.nodes and dst in g.nodes:
+            g.add_edge(src, dst, callsite=callsite)
+    return g
 
 def merge_digraphs(*graphs):
     if len(graphs) == 1:

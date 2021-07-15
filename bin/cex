@@ -135,6 +135,7 @@ def main(args):
         depgraph = proj.get_depgraph()
         dump_dot_depgraph(proj, depgraph, args.output)
 
+    additional_cg_edges_arg = args.additional_cg_edges or []
     cgs_dot    = args.dump_dot_cg or []
     icfgs_dot  = args.dump_dot_icfg or []
     cfgs_dot   = args.dump_dot_cfg or []
@@ -149,6 +150,17 @@ def main(args):
         graph = proj.get_callgraph(cg_addr)
         dump_dot_cg(cg_addr, graph, args.output)
 
+    additional_cg_edges = list()
+    for e in additional_cg_edges_arg:
+        src, dst, callsite = e.split(":")
+        src      = to_num(src)
+        dst      = to_num(dst)
+        callsite = to_num(callsite)
+        additional_cg_edges.append((src, dst, callsite))
+
+    if len(additional_cg_edges) == 0:
+        additional_cg_edges = None
+
     for cg_addr in cgs_json:
         if cg_addr == "-":
             cg_addr = None
@@ -159,7 +171,7 @@ def main(args):
             angr_plugin = CEXProject.pm.get_plugin_by_name("AngrEmulated")
             angr_plugin.set_state_constructor(cg_addr, constructor(args.set_vtable))
 
-        graph = proj.get_callgraph(cg_addr)
+        graph = proj.get_callgraph(cg_addr, additional_cg_edges=additional_cg_edges)
         dump_json_cg(cg_addr, graph, args.output)
 
     for icfg_addr in icfgs_dot:
@@ -167,7 +179,7 @@ def main(args):
             angr_plugin = CEXProject.pm.get_plugin_by_name("AngrEmulated")
             angr_plugin.set_state_constructor(to_num(icfg_addr), constructor(args.set_vtable))
 
-        graph = proj.get_icfg(to_num(icfg_addr))
+        graph = proj.get_icfg(to_num(icfg_addr), additional_cg_edges=additional_cg_edges)
         dump_dot_cfg(icfg_addr, graph, args.output)
 
     for icfg_addr in icfgs_json:
@@ -175,7 +187,7 @@ def main(args):
             angr_plugin = CEXProject.pm.get_plugin_by_name("AngrEmulated")
             angr_plugin.set_state_constructor(to_num(icfg_addr), constructor(args.set_vtable))
 
-        graph = proj.get_cfg(to_num(icfg_addr))
+        graph = proj.get_icfg(to_num(icfg_addr), additional_cg_edges=additional_cg_edges)
         dump_json_cfg(icfg_addr, graph, args.output)
 
     for cfg_addr in cfgs_dot:
@@ -209,6 +221,7 @@ if __name__=="__main__":
     parser.add_argument("--dump-json-cfg", metavar="ADDR", help="Dump the control flow graph of the function in json at address ADDR", nargs="*")
     parser.add_argument("--dump-dot-depgraph", help="Dump the library dependency graph", action="store_true")
     parser.add_argument("--set-vtable", help="Set first argument as C++ obj with vtable (only armv7)", nargs="?")
+    parser.add_argument("--additional-cg-edges", metavar="src:dst:callsite", help="Additional callgraph edge", nargs="*")
     parser.add_argument("binary", help="The binary to analyze")
     parser.add_argument("libs", help="Other libraries", nargs="*")
 
