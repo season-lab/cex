@@ -23,8 +23,9 @@ class CFGInstruction(object):
         self.call_refs = call_refs
 
     def to_json(self):
-        return '{{"addr": {addr}, "mnemonic": "{mnemonic}", "call_refs": {call_refs}}}'.format(
+        return '{{"addr": {addr}, "size": {size}, "mnemonic": "{mnemonic}", "call_refs": {call_refs}}}'.format(
             addr=self.addr,
+            size=self.size,
             mnemonic=self.mnemonic,
             call_refs='[%s]' % ", ".join(map(str, self.call_refs)))
 
@@ -43,13 +44,16 @@ class CFGNodeData(object):
         return "\l".join(map(str, self.insns)) + "\l"
 
     def get_json(self, successors: list):
-        res = '{{"addr": {addr}, "instructions": {insns}, "successors": {successors}}}'
+        res = '{{"addr": {addr}, "instructions": {insns}, "calls": {calls}, "is_thumb": {is_thumb}, "successors": {successors}}}'
         insns = map(lambda x: x.to_json(), self.insns)
         successors = map(str, successors)
+        calls = map(str, self.calls)
         return res.format(
             addr=self.addr,
             insns="[%s]" % ", ".join(insns),
-            successors="[%s]" % ", ".join(successors))
+            successors="[%s]" % ", ".join(successors),
+            calls="[%s]" % ", ".join(calls),
+            is_thumb="true" if self.is_thumb else "false")
 
     def join(self, other):
         " Append other instructions to self "
@@ -102,9 +106,11 @@ class CGNodeData(object):
         return "%s @ %#x" % (self.name, self.addr)
 
     def get_json(self, successors: list):
-        return '{{"addr": {addr}, "name": "{name}", "successors": {successors}}}'.format(
+        return '{{"addr": {addr}, "name": "{name}", "is_returning": {is_returning}, "return_sites": {return_sites}, "successors": {successors}}}'.format(
             addr=self.addr,
             name=self.name,
+            is_returning="true" if self.is_returning else "false",
+            return_sites="[%s]" % ", ".join(map(str, self.return_sites)),
             successors="[%s]" % ", ".join(map(str, successors)))
 
     def __str__(self):
