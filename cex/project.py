@@ -73,6 +73,8 @@ class CEXProject(object):
                 if additional_cg_edges is not None:
                     res = add_cg_edges(res, additional_cg_edges)
                 return res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
+            if additional_cg_edges is not None:
+                res = add_cg_edges(res, additional_cg_edges)
             return res
 
         self.get_depgraph()

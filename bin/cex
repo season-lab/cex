@@ -142,13 +142,6 @@ def main(args):
     cgs_json   = args.dump_json_cg or []
     icfgs_json = args.dump_json_icfg or []
     cfgs_json  = args.dump_json_cfg or []
-    for cg_addr in cgs_dot:
-        if cg_addr == "-":
-            cg_addr = None
-        else:
-            cg_addr = to_num(cg_addr)
-        graph = proj.get_callgraph(cg_addr)
-        dump_dot_cg(cg_addr, graph, args.output)
 
     additional_cg_edges = list()
     for e in additional_cg_edges_arg:
@@ -160,6 +153,14 @@ def main(args):
 
     if len(additional_cg_edges) == 0:
         additional_cg_edges = None
+
+    for cg_addr in cgs_dot:
+        if cg_addr == "-":
+            cg_addr = None
+        else:
+            cg_addr = to_num(cg_addr)
+        graph = proj.get_callgraph(cg_addr, additional_cg_edges=additional_cg_edges)
+        dump_dot_cg(cg_addr, graph, args.output)
 
     for cg_addr in cgs_json:
         if cg_addr == "-":
