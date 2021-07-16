@@ -90,7 +90,7 @@ public class ExportCFG extends HeadlessScript {
                 first_iter_functions = false;
 
             pout.format(" {\n");
-            pout.format("  \"name\": \"%s\",\n", f.getName());
+            pout.format("  \"name\": \"%s\",\n", f.getName().replace('"', '_'));
             pout.format("  \"addr\": \"%#x\",\n", f.getEntryPoint().getOffset());
             pout.format("  \"is_returning\" : \"%s\",\n", f.hasNoReturn() ? "false" : "true");
             pout.format("  \"is_thumb\" : \"%s\",\n", isThumb(f) ? "true" : "false");
