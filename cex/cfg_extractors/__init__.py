@@ -58,7 +58,7 @@ class CFGNodeData(object):
     def join(self, other):
         " Append other instructions to self "
         assert isinstance(other, CFGNodeData)
-        return CFGNodeData(self.addr, self.insns + other.insns, self.calls + other.calls, is_thumb=self.is_thumb or other.is_thumb)
+        return CFGNodeData(self.addr, self.insns + other.insns, list(set(self.calls + other.calls)), is_thumb=self.is_thumb or other.is_thumb)
 
     def merge(self, other):
         """
