@@ -159,6 +159,11 @@ def main(args):
             cg_addr = None
         else:
             cg_addr = to_num(cg_addr)
+
+        if cg_addr is not None and args.set_vtable is not None:
+            angr_plugin = CEXProject.pm.get_plugin_by_name("AngrEmulated")
+            angr_plugin.set_state_constructor(cg_addr, constructor(args.set_vtable))
+
         graph = proj.get_callgraph(cg_addr, additional_cg_edges=additional_cg_edges)
         dump_dot_cg(cg_addr, graph, args.output)
 
