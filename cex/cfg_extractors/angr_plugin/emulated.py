@@ -12,6 +12,7 @@ class AngrEmuBinaryData(object):
         self.cg        = cg
         self.icfg_raw  = icfg_raw
         self.icfg      = icfg
+        self.additional_edges = list()
 
 class new(angr.SimProcedure):
     def run(self, sim_size):
@@ -94,6 +95,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 icfg=dict())
 
             AngrCfgExtractor._hook_fp_models(self.multi_cache[h].proj)
+            # AngrCfgExtractor._hook_misc_models(self.multi_cache[h].proj, self.multi_cache[h].additional_edges)
 
         return self.multi_cache[h].proj
 
@@ -170,6 +172,15 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
                     g.add_edge(src, dst, callsite=callsite)
 
+        for src, dst, _, callsite in self.multi_cache[h].additional_edges:
+            if is_arm:
+                src -= src % 2
+                dst -= dst % 2
+                callsite -= callsite % 2
+
+            if src in g.nodes and dst in g.nodes:
+                g.add_edge(src, dst, callsite=callsite)
+
         self.multi_cache[h].cg[entry] = g.subgraph(nx.dfs_postorder_nodes(g, orig_entry)).copy()
         self.multi_cache[h].icfg_raw[entry] = icfg_raw
         return self.multi_cache[h].cg[entry]
@@ -244,6 +255,14 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             if src_addr not in g.nodes or dst_addr not in g.nodes:
                 continue
             g.add_edge(src_addr, dst_addr)
+
+        for _, dst, src, _ in self.multi_cache[h].additional_edges:
+            if is_arm:
+                src -= src % 2
+                dst -= dst % 2
+
+            if src in g.nodes and dst in g.nodes:
+                g.add_edge(src, dst)
 
         g = g.subgraph(nx.dfs_postorder_nodes(g, entry)).copy()
         self.multi_cache[h].icfg[entry] = g

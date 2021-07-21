@@ -1,5 +1,6 @@
 import sys
 import angr
+import claripy
 import networkx as nx
 
 from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, FunctionNotFoundException
@@ -10,12 +11,77 @@ class DummyEmptyModel(angr.SimProcedure):
     def run(self, *args):
         return None
 
+class PthreadCreateModel(angr.SimProcedure):
+    def __init__(self, edges: list, *args, **xargs):
+        super().__init__(*args, **xargs)
+        self.edges = edges
+
+    def _get_function_containing(self, addr):
+        for f_addr in self.project.kb.functions:
+            fun = self.project.kb.functions[f_addr]
+            if addr in fun.block_addrs:
+                return f_addr
+        return None
+
+    def run(self, thread, attr, start_routine, arg):
+        if start_routine.symbolic:
+            return claripy.BVV(0, self.arch.bits)
+
+        if self.state.history.parent is None:
+            return claripy.BVV(0, self.arch.bits)
+
+        parent_bb = self.state.history.parent.addr
+        parent_bb = self.state.block(parent_bb)
+        if len(parent_bb.instruction_addrs) == 0:
+            return claripy.BVV(0, self.arch.bits)
+
+        src = self._get_function_containing(parent_bb.addr)
+        if src is None:
+            return claripy.BVV(0, self.arch.bits)
+
+        callsite = parent_bb.instruction_addrs[-1]
+        dst      = start_routine.args[0]
+
+        block_callsite = parent_bb.addr
+        self.edges.append((src, dst, block_callsite, callsite))
+
+        self.call(start_routine, (arg,), 'terminate_thread')
+        self.ret(self.state.solver.BVV(0, self.state.arch.bits))
+
+    def terminate_thread(self, thread, attr, start_routine, arg):
+        self.exit(0)
+
+    def static_exits(self, blocks):
+        # Execute those blocks with a blank state, and then dump the arguments
+        blank_state = angr.SimState(project=self.project, mode="fastpath", cle_memory_backer=self.project.loader.memory)
+
+        # Execute each block
+        state = blank_state
+        for b in blocks:
+            irsb = self.project.factory.default_engine.process(state, b, force_addr=b.addr)
+            if irsb.successors:
+                state = irsb.successors[0]
+            else:
+                break
+
+        cc = angr.DEFAULT_CC[self.arch.name](self.arch)
+        callfunc = cc.arg(state, 2)
+        retaddr = state.memory.load(state.regs.sp, self.arch.bytes)
+
+        all_exits = [
+            {'address': callfunc, 'jumpkind': 'Ijk_Call', 'namehint': 'thread_entry'},
+            {'address': retaddr, 'jumpkind': 'Ijk_Ret', 'namehint': None},
+        ]
+
+        return all_exits
+
 class AngrBinaryData(object):
     def __init__(self, proj, processed, cg, cfg):
         self.proj      = proj
         self.processed = processed
         self.cg        = cg
         self.cfg       = cfg
+        self.additional_edges = list()
 
 
 class AngrCfgExtractor(ICfgExtractor):
@@ -91,6 +157,12 @@ class AngrCfgExtractor(ICfgExtractor):
         for n in to_hook:
             hook_with_dummy(n)
 
+    @staticmethod
+    def _hook_misc_models(proj, additional_edges):
+        if proj.loader.find_symbol("pthread_create") is not None:
+            proj.hook_symbol(
+                "pthread_create", PthreadCreateModel(additional_edges), replace=True)
+
     def _build_project(self, binary: str):
         if binary not in self.data:
             load_options={'main_opts': {}}
@@ -102,6 +174,7 @@ class AngrCfgExtractor(ICfgExtractor):
                 cg=dict(),
                 cfg=dict())
             AngrCfgExtractor._hook_fp_models(self.data[binary].proj)
+            # AngrCfgExtractor._hook_misc_models(self.data[binary].proj, self.data[binary].additional_edges)
 
     def _get_angr_cfg(self, proj, addr):
         # Look in subclasses
@@ -201,6 +274,14 @@ class AngrCfgExtractor(ICfgExtractor):
                             g.add_node(dst, data=CGNodeData(addr=dst, name=fun_dst.name, is_returning=is_returning, return_sites=ret_sites))
 
                         g.add_edge(src, dst, callsite=callsite)
+
+            for src, dst, _, callsite in self.data[binary].additional_edges:
+                if is_arm:
+                    src -= src % 2
+                    dst -= dst % 2
+                    callsite -= callsite % 2
+                if src in g.nodes and dst in g.nodes:
+                    g.add_edge(src, dst, callsite=callsite)
 
             self.data[binary].cg[orig_entry] = g.subgraph(nx.dfs_postorder_nodes(g, orig_entry)).copy()
 
