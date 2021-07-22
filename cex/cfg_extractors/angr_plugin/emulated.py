@@ -5,6 +5,7 @@ import os
 
 from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor
 from cex.cfg_extractors import IMultilibCfgExtractor, CGNodeData, CFGInstruction, CFGNodeData
+from cex.cfg_extractors.angr_plugin.graph_utils import timeout, TimeoutError
 
 class AngrEmuBinaryData(object):
     def __init__(self, proj, cg, icfg_raw, icfg):
@@ -27,6 +28,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
         self._state_constructors = dict()
         self.multi_cache = dict()
+        self.use_timeout_for_cfg = False
 
     def set_state_constructor(self, addr, fun: callable):
         self._state_constructors[addr] = fun
@@ -38,6 +40,14 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             # Invalidate caches (we want to rebuild projects)
             self.multi_cache = dict()
             self.data        = dict()
+
+    @timeout(60 * 30)
+    def wrap_with_timeout_cfgemulated(self, proj, addr, state):
+        cfg = proj.analyses.CFGEmulated(
+            fail_fast=True, keep_state=True, starts=[addr],
+            context_sensitivity_level=1, call_depth=5,
+            initial_state=state)
+        return cfg
 
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
@@ -56,10 +66,13 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         # NOTE: keep_state=True is necessary, otherwise
         #       SimProcedures are not called
         try:
-            cfg = proj.analyses.CFGEmulated(
-                fail_fast=True, keep_state=True, starts=[addr],
-                context_sensitivity_level=1, call_depth=5,
-                initial_state=state)
+            if not self.use_timeout_for_cfg:
+                cfg = proj.analyses.CFGEmulated(
+                    fail_fast=True, keep_state=True, starts=[addr],
+                    context_sensitivity_level=1, call_depth=5,
+                    initial_state=state)
+            else:
+                cfg = self.wrap_with_timeout_cfgemulated(proj, addr, state)
         except Exception as e:
             AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % str(e))
             cfg = None

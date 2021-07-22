@@ -1,13 +1,15 @@
 # Copyright (c) 2017, The Regents of the University of California
 # Taken From https://github.com/angr/angr-management/blob/8b1eafe13f1284b2f8adeb379b93f2f6815761da/angrmanagement/utils/graph.py
 
-import itertools
+from functools import wraps
 from collections import defaultdict
-
-import networkx
-
 from angr.knowledge_plugins import Function
 
+import itertools
+import errno
+import os
+import signal
+import networkx
 
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
@@ -317,3 +319,24 @@ class SuperCFGNode:
             return False
 
         return self.addr == other.addr
+
+class TimeoutError(Exception):
+    pass
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
