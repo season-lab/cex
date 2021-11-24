@@ -74,7 +74,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             else:
                 cfg = self.wrap_with_timeout_cfgemulated(proj, addr, state)
         except Exception as e:
-            AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % str(e))
+            AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % repr(e))
             cfg = None
         return cfg
 
@@ -133,7 +133,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
 
         icfg_raw = self._get_angr_cfg(proj, orig_entry)
         if icfg_raw is None:
-            return nx.MultiDiGraph()
+            self.multi_cache[h].cg[orig_entry] = nx.MultiDiGraph()
+            return self.multi_cache[h].cg[orig_entry]
 
         g = nx.MultiDiGraph()
         for src in proj.kb.functions:
@@ -194,9 +195,9 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             if src in g.nodes and dst in g.nodes:
                 g.add_edge(src, dst, callsite=callsite)
 
-        self.multi_cache[h].cg[entry] = g.subgraph(nx.dfs_postorder_nodes(g, orig_entry)).copy()
-        self.multi_cache[h].icfg_raw[entry] = icfg_raw
-        return self.multi_cache[h].cg[entry]
+        self.multi_cache[h].cg[orig_entry] = g.subgraph(nx.dfs_postorder_nodes(g, orig_entry)).copy()
+        self.multi_cache[h].icfg_raw[orig_entry] = icfg_raw
+        return self.multi_cache[h].cg[orig_entry]
 
     def get_icfg(self, binary, libraries=None, entry=None, addresses=None):
         libraries = libraries or list()
