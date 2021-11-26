@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import time
+import logging
 import subprocess
 import networkx as nx
 
@@ -20,6 +22,7 @@ class GhidraBinaryData(object):
 
 
 class GhidraCfgExtractor(ICfgExtractor):
+    log = logging.getLogger("cex.GhidraCfgExtractor")
 
     CMD_ANALYSIS_ONLY = [
         "$GHIDRA_HOME/support/analyzeHeadless",
@@ -225,7 +228,11 @@ class GhidraCfgExtractor(ICfgExtractor):
             cfg_json_path = os.path.join(self.get_tmp_folder(), cfg_json_name)
             if not os.path.exists(cfg_json_path):
                 cmd = self._get_cmd_cfg(binary, cfg_json_path)
+                start = time.time()
                 subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                elapsed = time.time() - start
+                if elapsed >= float(TIMEOUT):
+                    GhidraCfgExtractor.log.warning("CFG: Timeout elapsed on %s" % binary)
 
             with open(cfg_json_path, "r") as fin:
                 cfg_raw = json.load(fin)
@@ -242,7 +249,11 @@ class GhidraCfgExtractor(ICfgExtractor):
             cg_json_path = os.path.join(self.get_tmp_folder(), cg_json_name)
             if not os.path.exists(cg_json_path):
                 cmd = self._get_cmd_cg(binary, cg_json_path)
+                start = time.time()
                 subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                elapsed = time.time() - start
+                if elapsed >= float(TIMEOUT):
+                    GhidraCfgExtractor.log.warning("CG: Timeout elapsed on %s" % binary)
 
             with open(cg_json_path, "r") as fin:
                 cg_raw = json.load(fin)
@@ -250,13 +261,19 @@ class GhidraCfgExtractor(ICfgExtractor):
             self.data[binary].cg_raw = cg_raw
 
     def define_functions(self, binary, offsets):
-        infile = "/dev/shm/offsets.txt"
+        infile = os.path.join(
+            self.get_tmp_folder(), get_md5_file(binary) + "_offsets.txt")
         with open(infile, "w") as fout:
             for off in offsets:
                 fout.write("%#x\n" % off)
 
         cmd = self._get_cmd_custom_functions(binary, infile)
+        start = time.time()
         out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - start
+        if elapsed >= float(TIMEOUT):
+            GhidraCfgExtractor.log.warning("DEF_FUNCS: Timeout elapsed on %s" % binary)
+
         if b"[OUT] OK" in out:
             # at least one function is new
             self._clear_cg_cfg_cache_for_binary(binary)
