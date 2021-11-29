@@ -3,7 +3,11 @@ import rzpipe
 
 def check_pie(binary):
     rz  = rzpipe.open(binary, flags=["-2"])
-    res = rz.cmdj("iIj")["pic"]
+    res = rz.cmdj("iIj")
+    if "pic" in res:
+        res = res["pic"]
+    else:
+        res = res["PIE"]
     rz.quit()
     return res
 
