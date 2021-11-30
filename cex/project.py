@@ -163,7 +163,7 @@ class CEXProject(object):
             if additional_cg_edges is not None:
                 res = add_cg_edges(res, additional_cg_edges)
 
-            if addr is not None:
+            if addr is not None and len(res.nodes) > 0:
                 res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
 
             for lib in get_involved_libs(res):
@@ -174,7 +174,8 @@ class CEXProject(object):
         if addr is not None:
             if additional_cg_edges is not None:
                 res = add_cg_edges(res, additional_cg_edges)
-            res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
+            if len(res.nodes) > 0:
+                res = res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
         return res
 
     def get_cfg(self, addr, no_multilib=False):
