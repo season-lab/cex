@@ -30,6 +30,10 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         self.multi_cache = dict()
         self.use_timeout_for_cfg = False
 
+        self.timeout = 1800
+        self.calldepth = 5
+        self.ctx_sensisitivity = 1
+
     def set_state_constructor(self, addr, fun: callable):
         self._state_constructors[addr] = fun
 
@@ -41,11 +45,11 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             self.multi_cache = dict()
             self.data        = dict()
 
-    @timeout(60 * 30)
-    def wrap_with_timeout_cfgemulated(self, proj, addr, state):
+    def _internal_get_cfg(self, proj, addr, state):
         cfg = proj.analyses.CFGEmulated(
             fail_fast=True, keep_state=True, starts=[addr],
-            context_sensitivity_level=1, call_depth=5,
+            context_sensitivity_level=self.ctx_sensisitivity,
+            call_depth=self.calldepth,
             initial_state=state)
         return cfg
 
@@ -67,12 +71,10 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         #       SimProcedures are not called
         try:
             if not self.use_timeout_for_cfg:
-                cfg = proj.analyses.CFGEmulated(
-                    fail_fast=True, keep_state=True, starts=[addr],
-                    context_sensitivity_level=1, call_depth=5,
-                    initial_state=state)
+                cfg = self._internal_get_cfg(proj, addr, state)
             else:
-                cfg = self.wrap_with_timeout_cfgemulated(proj, addr, state)
+                timeout_wrapped = timeout(seconds=self.timeout)(self._internal_get_cfg)
+                cfg = timeout_wrapped(proj, addr, state)
         except Exception as e:
             AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % repr(e))
             cfg = None

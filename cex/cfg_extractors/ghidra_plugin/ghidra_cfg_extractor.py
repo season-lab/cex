@@ -9,8 +9,6 @@ import networkx as nx
 from cex.cfg_extractors import CFGNodeData, CFGInstruction, CGNodeData, ICfgExtractor, ExtCallInfo
 from cex.cfg_extractors.utils import check_pie, get_md5_file
 
-TIMEOUT = "1200"
-
 
 class GhidraBinaryData(object):
     def __init__(self, cfg_raw=None, cg_raw=None, cg=None, acc_cg=None, ext_calls=None):
@@ -28,7 +26,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", TIMEOUT,
+        "-analysisTimeoutPerFile", "$TIMEOUT",
         "-import",
         "$BINARY",
         "-scriptPath",
@@ -64,7 +62,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", TIMEOUT,
+        "-analysisTimeoutPerFile", "$TIMEOUT",
         "-import",
         "$BINARY",
         "-postScript",
@@ -77,7 +75,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", TIMEOUT,
+        "-analysisTimeoutPerFile", "$TIMEOUT",
         "-import",
         "$BINARY",
         "-postScript",
@@ -103,7 +101,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         "$GHIDRA_HOME/support/analyzeHeadless",
         "$PROJ_FOLDER",
         "$PROJ_NAME",
-        "-analysisTimeoutPerFile", TIMEOUT,
+        "-analysisTimeoutPerFile", "$TIMEOUT",
         "-import",
         "$BINARY",
         "-postScript",
@@ -123,6 +121,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         self.data = dict()
 
         self.use_accurate = False
+        self.timeout = 1200
 
     def loadable(self):
         return "GHIDRA_HOME" in os.environ
@@ -139,6 +138,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                     .replace("$GHIDRA_HOME", ghidra_home)           \
                     .replace("$BINARY", binary)                     \
                     .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
+                    .replace("$TIMEOUT", str(self.timeout))         \
                     .replace("$PROJ_NAME", proj_name)
             if check_pie(binary):
                 cmd += GhidraCfgExtractor.CMD_PIE_ELF
@@ -164,6 +164,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$BINARY", binary)                     \
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
+                .replace("$TIMEOUT", str(self.timeout))         \
                 .replace("$INFILE", infile)
 
         if check_pie(binary_fullpath):
@@ -188,6 +189,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$BINARY", binary)                     \
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
+                .replace("$TIMEOUT", str(self.timeout))         \
                 .replace("$OUTFILE", outfile)
 
         if check_pie(binary_fullpath):
@@ -212,6 +214,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 .replace("$BINARY", binary)                     \
                 .replace("$PROJ_FOLDER", self.get_tmp_folder()) \
                 .replace("$PROJ_NAME", proj_name)               \
+                .replace("$TIMEOUT", str(self.timeout))         \
                 .replace("$OUTFILE", outfile)
 
         if check_pie(binary_fullpath):
@@ -231,7 +234,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 start = time.time()
                 subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 elapsed = time.time() - start
-                if elapsed >= float(TIMEOUT):
+                if elapsed >= float(self.timeout):
                     GhidraCfgExtractor.log.warning("CFG: Timeout elapsed on %s" % binary)
 
             with open(cfg_json_path, "r") as fin:
@@ -252,7 +255,7 @@ class GhidraCfgExtractor(ICfgExtractor):
                 start = time.time()
                 subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 elapsed = time.time() - start
-                if elapsed >= float(TIMEOUT):
+                if elapsed >= float(self.timeout):
                     GhidraCfgExtractor.log.warning("CG: Timeout elapsed on %s" % binary)
 
             with open(cg_json_path, "r") as fin:
@@ -271,7 +274,7 @@ class GhidraCfgExtractor(ICfgExtractor):
         start = time.time()
         out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
         elapsed = time.time() - start
-        if elapsed >= float(TIMEOUT):
+        if elapsed >= float(self.timeout):
             GhidraCfgExtractor.log.warning("DEF_FUNCS: Timeout elapsed on %s" % binary)
 
         if b"[OUT] OK" in out:
