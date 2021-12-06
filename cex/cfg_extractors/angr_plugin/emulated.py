@@ -33,6 +33,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         self.timeout = 1800
         self.calldepth = 5
         self.ctx_sensisitivity = 1
+        self.bb_iterations = 1
 
     def set_state_constructor(self, addr, fun: callable):
         self._state_constructors[addr] = fun
@@ -50,6 +51,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             fail_fast=True, keep_state=True, starts=[addr],
             context_sensitivity_level=self.ctx_sensisitivity,
             call_depth=self.calldepth,
+            max_iterations=self.bb_iterations,
             initial_state=state)
         return cfg
 
