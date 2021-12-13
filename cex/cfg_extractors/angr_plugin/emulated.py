@@ -100,7 +100,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
                 timeout_wrapped = timeout(seconds=self.timeout)(self._internal_get_cfg)
                 cfg = timeout_wrapped(proj, addr, state)
         except Exception as e:
-            AngrCfgExtractorEmulated.log.warning("CFGEmulated failed [%s]" % repr(e))
+            AngrCfgExtractorEmulated.log.warning("CFGEmulated @ %s+%#x failed [%s]" % (proj.filename, addr, repr(e)))
             cfg = None
         return cfg
 

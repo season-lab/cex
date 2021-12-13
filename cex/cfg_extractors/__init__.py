@@ -43,7 +43,8 @@ class CFGNodeData(object):
     def get_dot_label(self):
         return "\l".join(map(str, self.insns)) + "\l"
 
-    def get_json(self, successors: list):
+    def get_json(self, graph):
+        successors = list(map(lambda x: x[1], graph.out_edges(self.addr)))
         res = '{{"addr": {addr}, "instructions": {insns}, "calls": {calls}, "is_thumb": {is_thumb}, "successors": {successors}}}'
         insns = map(lambda x: x.to_json(), self.insns)
         successors = map(str, successors)
@@ -105,7 +106,12 @@ class CGNodeData(object):
     def get_dot_label(self):
         return "%s @ %#x" % (self.name, self.addr)
 
-    def get_json(self, successors: list):
+    def get_json(self, graph):
+        successors = list()
+        for e in graph.edges:
+            if e[0] != self.addr:
+                continue
+            successors.append("{\"addr\": %d, \"callsite\": %d}" % (e[1], graph.edges[e]["callsite"]))
         return '{{"addr": {addr}, "name": "{name}", "is_returning": {is_returning}, "return_sites": {return_sites}, "successors": {successors}}}'.format(
             addr=self.addr,
             name=self.name,
