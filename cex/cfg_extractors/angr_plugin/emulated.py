@@ -15,13 +15,31 @@ class AngrEmuBinaryData(object):
         self.icfg      = icfg
         self.additional_edges = list()
 
+# Limit the maximum alloc size...
+max_malloc_size = 0x10000
 class new(angr.SimProcedure):
     def run(self, sim_size):
+        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+            sim_size = max_malloc_size
         return self.state.heap._malloc(sim_size)
 
+class malloc(angr.SimProcedure):
+    def run(self, sim_size):
+        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+            sim_size = max_malloc_size
+        return self.state.heap._malloc(sim_size)
+
+class calloc(angr.SimProcedure):
+    def run(self, sim_nmemb, sim_size):
+        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+            sim_size = max_malloc_size
+        if not self.state.solver.symbolic(sim_nmemb) and sim_nmemb > max_malloc_size:
+            sim_nmemb = max_malloc_size
+        return self.state.heap._calloc(sim_nmemb, sim_size)
 
 class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     log = logging.getLogger("cex.AngrCfgExtractorEmulated")
+    # log.setLevel(logging.INFO)
 
     def __init__(self):
         super().__init__()
@@ -47,18 +65,22 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             self.data        = dict()
 
     def _internal_get_cfg(self, proj, addr, state):
+        AngrCfgExtractorEmulated.log.info("Building the CFG @ %#x" % addr)
         cfg = proj.analyses.CFGEmulated(
             fail_fast=True, keep_state=True, starts=[addr],
             context_sensitivity_level=self.ctx_sensisitivity,
             call_depth=self.calldepth,
             max_iterations=self.bb_iterations,
             initial_state=state)
+        AngrCfgExtractorEmulated.log.info("CFG created")
         return cfg
 
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
         proj.hook_symbol("_Znwm", new(), replace=True)
         proj.hook_symbol("_Znwj", new(), replace=True)
+        proj.hook_symbol("malloc", malloc(), replace=True)
+        proj.hook_symbol("calloc", calloc(), replace=True)
 
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
