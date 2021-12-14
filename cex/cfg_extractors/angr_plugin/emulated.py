@@ -239,7 +239,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             cfg = self._get_angr_cfg(proj, entry)
             if cfg is None:
                 self.multi_cache[h].icfg_raw[entry] = None
-                return self.multi_cache[h].icfg_raw[entry]
+                return nx.DiGraph()
             self.multi_cache[h].icfg_raw[entry] = cfg
 
         cfg = self.multi_cache[h].icfg_raw[entry]
