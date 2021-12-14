@@ -238,11 +238,13 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         if entry not in self.multi_cache[h].icfg_raw:
             cfg = self._get_angr_cfg(proj, entry)
             if cfg is None:
-                self.multi_cache[h].icfg_raw[entry] = nx.DiGraph()
+                self.multi_cache[h].icfg_raw[entry] = None
                 return self.multi_cache[h].icfg_raw[entry]
             self.multi_cache[h].icfg_raw[entry] = cfg
 
         cfg = self.multi_cache[h].icfg_raw[entry]
+        if cfg is None:
+            return nx.DiGraph()
 
         g = nx.DiGraph()
         is_arm = False
