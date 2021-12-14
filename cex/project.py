@@ -22,7 +22,7 @@ class CEXProject(object):
         self.bin  = BinInfo(main_binary, 0x400000)
         self.libs = list()
 
-        addr = 0x7f000000
+        addr = 0x7f000000000
         libs = libs or list()
         for lib in libs:
             binfo = BinInfo(lib, addr)

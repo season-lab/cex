@@ -109,9 +109,10 @@ class CGNodeData(object):
     def get_json(self, graph):
         successors = list()
         for e in graph.edges:
-            if e[0] != self.addr:
+            if graph.nodes[e[0]]["data"].addr != self.addr:
                 continue
-            successors.append("{\"addr\": %d, \"callsite\": %d}" % (e[1], graph.edges[e]["callsite"]))
+            successors.append("{\"addr\": %d, \"callsite\": %d}" % \
+                (graph.nodes[e[1]]["data"].addr, graph.edges[e]["callsite"]))
         return '{{"addr": {addr}, "name": "{name}", "is_returning": {is_returning}, "return_sites": {return_sites}, "successors": {successors}}}'.format(
             addr=self.addr,
             name=self.name,

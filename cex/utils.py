@@ -1,6 +1,6 @@
 import networkx as nx
 
-from collections import defaultdict
+from copy import deepcopy
 
 def explode_cfg(g):
     res_g = nx.DiGraph()
@@ -158,7 +158,7 @@ def merge_cgs(*graphs):
 
 def fix_graph_addresses(graph, off):
     mapping = lambda a : a + off
-    graph = nx.relabel_nodes(graph, mapping, copy=True)
+    graph = nx.relabel_nodes(deepcopy(graph), mapping, copy=False)
     for n_id in graph.nodes:
         n = graph.nodes[n_id]
         data = n["data"]
