@@ -19,7 +19,7 @@ class AngrEmuBinaryData(object):
 max_malloc_size = 0x10000
 class new(angr.SimProcedure):
     def run(self, sim_size):
-        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+        if not self.state.solver.symbolic(sim_size) and self.state.solver.eval(sim_size) > max_malloc_size:
             sim_size = max_malloc_size
         return self.state.heap._malloc(sim_size)
 
@@ -75,12 +75,17 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         AngrCfgExtractorEmulated.log.info("CFG created")
         return cfg
 
+    @staticmethod
+    def _hook_if_present(proj, symbol, hook):
+        if proj.loader.find_symbol(symbol) is not None:
+            proj.hook_symbol(symbol, hook, replace=True)
+
     def _get_angr_cfg(self, proj, addr):
         # Hook some symbols
-        proj.hook_symbol("_Znwm", new(), replace=True)
-        proj.hook_symbol("_Znwj", new(), replace=True)
-        proj.hook_symbol("malloc", malloc(), replace=True)
-        proj.hook_symbol("calloc", calloc(), replace=True)
+        AngrCfgExtractorEmulated._hook_if_present(proj, "_Znwm", new())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "_Znwj", new())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "malloc", malloc())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "calloc", calloc())
 
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
