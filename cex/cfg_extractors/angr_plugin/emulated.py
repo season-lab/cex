@@ -25,15 +25,15 @@ class new(angr.SimProcedure):
 
 class malloc(angr.SimProcedure):
     def run(self, sim_size):
-        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+        if not self.state.solver.symbolic(sim_size) and self.state.solver.eval(sim_size) > max_malloc_size:
             sim_size = max_malloc_size
         return self.state.heap._malloc(sim_size)
 
 class calloc(angr.SimProcedure):
     def run(self, sim_nmemb, sim_size):
-        if not self.state.solver.symbolic(sim_size) and sim_size > max_malloc_size:
+        if not self.state.solver.symbolic(sim_size) and self.state.solver.eval(sim_size) > max_malloc_size:
             sim_size = max_malloc_size
-        if not self.state.solver.symbolic(sim_nmemb) and sim_nmemb > max_malloc_size:
+        if not self.state.solver.symbolic(sim_nmemb) and self.state.solver.eval(sim_nmemb) > max_malloc_size:
             sim_nmemb = max_malloc_size
         return self.state.heap._calloc(sim_nmemb, sim_size)
 
