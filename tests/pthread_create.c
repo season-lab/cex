@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <pthread.h>
 
-pthread_once_t once_control = PTHREAD_ONCE_INIT;
-
 void* fun(void* a)
 {
     (void)a;
