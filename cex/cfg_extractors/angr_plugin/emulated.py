@@ -1,11 +1,27 @@
 import networkx as nx
+import threading
+import resource
 import logging
+import signal
+import psutil
 import angr
+import time
+import gc
 import os
 
 from cex.cfg_extractors.angr_plugin.common import AngrCfgExtractor
 from cex.cfg_extractors import IMultilibCfgExtractor, CGNodeData, CFGInstruction, CFGNodeData
 from cex.cfg_extractors.angr_plugin.graph_utils import timeout, TimeoutError
+
+# Define custom handlers. Used to support timeout and maximum memory usage
+def sig_handler(signum, frame):
+    if signum == signal.SIGUSR1:
+        raise Exception("Timeout")
+    if signum == signal.SIGUSR2:
+        raise Exception("OOM")
+
+signal.signal(signal.SIGUSR1, sig_handler)
+signal.signal(signal.SIGUSR2, sig_handler)
 
 class AngrEmuBinaryData(object):
     def __init__(self, proj, cg, icfg_raw, icfg):
@@ -48,7 +64,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         self.multi_cache = dict()
         self.use_timeout_for_cfg = False
 
-        self.timeout = 1800
+        self.max_memory = None  # bytes
+        self.timeout = 1800     # seconds
         self.calldepth = 5
         self.ctx_sensisitivity = 1
         self.bb_iterations = 1
@@ -64,14 +81,41 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
             self.multi_cache = dict()
             self.data        = dict()
 
-    def _internal_get_cfg(self, proj, addr, state):
+    def _internal_get_cfg(self, proj, addr, state, max_time=None, max_memory=None):
         AngrCfgExtractorEmulated.log.info("Building the CFG @ %#x" % addr)
+
+        should_stop_closure = False
+        def monitor_time_memory():
+            if max_time is None and max_memory is None:
+                return
+            process = psutil.Process(os.getpid())
+
+            start = time.time()
+            while not should_stop_closure:
+                elapsed   = time.time() - start
+                mem_usage = process.memory_info().rss
+
+                if max_time is not None and elapsed > max_time:
+                    signal.raise_signal(signal.SIGUSR1)
+                    break
+                if max_memory is not None and mem_usage > max_memory:
+                    signal.raise_signal(signal.SIGUSR2)
+                    break
+                time.sleep(0.1)
+
+        t = threading.Thread(target=monitor_time_memory)
+        t.start()
+
         cfg = proj.analyses.CFGEmulated(
             fail_fast=True, keep_state=True, starts=[addr],
             context_sensitivity_level=self.ctx_sensisitivity,
             call_depth=self.calldepth,
             max_iterations=self.bb_iterations,
             initial_state=state)
+
+        should_stop_closure = True
+        t.join()
+
         AngrCfgExtractorEmulated.log.info("CFG created")
         return cfg
 
@@ -99,13 +143,16 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         # NOTE: keep_state=True is necessary, otherwise
         #       SimProcedures are not called
         try:
-            if not self.use_timeout_for_cfg:
-                cfg = self._internal_get_cfg(proj, addr, state)
-            else:
-                timeout_wrapped = timeout(seconds=self.timeout)(self._internal_get_cfg)
-                cfg = timeout_wrapped(proj, addr, state)
+            cfg = self._internal_get_cfg(
+                proj,
+                addr,
+                state,
+                max_time=self.timeout if self.use_timeout_for_cfg else None,
+                max_memory=self.max_memory)
         except Exception as e:
             AngrCfgExtractorEmulated.log.warning("CFGEmulated @ %s+%#x failed [%s]" % (proj.filename, addr, repr(e)))
+            if str(e) == "OOM":
+                gc.collect()
             cfg = None
         return cfg
 
