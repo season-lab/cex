@@ -53,6 +53,18 @@ class calloc(angr.SimProcedure):
             sim_nmemb = max_malloc_size
         return self.state.heap._calloc(sim_nmemb, sim_size)
 
+class memsetWrapper(angr.procedures.libc.memset.memset):
+    def run(self, dst_addr, char, num):
+        if not self.state.solver.symbolic(num) and self.state.solver.eval(num) > max_malloc_size:
+            num = max_malloc_size
+        return super().run(dst_addr, char, num)
+
+class memcpyWrapper(angr.procedures.libc.memcpy.memcpy):
+    def run(self, dst_addr, src_addr, limit):
+        if not self.state.solver.symbolic(limit) and self.state.solver.eval(limit) > max_malloc_size:
+            limit = max_malloc_size
+        return super().run(dst_addr, src_addr, limit)
+
 class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     log = logging.getLogger("cex.AngrCfgExtractorEmulated")
     # log.setLevel(logging.INFO)
@@ -130,6 +142,8 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         AngrCfgExtractorEmulated._hook_if_present(proj, "_Znwj", new())
         AngrCfgExtractorEmulated._hook_if_present(proj, "malloc", malloc())
         AngrCfgExtractorEmulated._hook_if_present(proj, "calloc", calloc())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "memset", memsetWrapper())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "memcpy", memcpyWrapper())
 
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
