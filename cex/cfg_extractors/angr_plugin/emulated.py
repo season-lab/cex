@@ -118,12 +118,21 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         t = threading.Thread(target=monitor_time_memory)
         t.start()
 
-        cfg = proj.analyses.CFGEmulated(
-            fail_fast=True, keep_state=True, starts=[addr],
-            context_sensitivity_level=self.ctx_sensisitivity,
-            call_depth=self.calldepth,
-            max_iterations=self.bb_iterations,
-            initial_state=state)
+        try:
+            # We are accurate, but with an incomplete graph
+            # NOTE: keep_state=True is necessary, otherwise
+            #       SimProcedures are not called
+            cfg = proj.analyses.CFGEmulated(
+                fail_fast=True, keep_state=True, starts=[addr],
+                context_sensitivity_level=self.ctx_sensisitivity,
+                call_depth=self.calldepth,
+                max_iterations=self.bb_iterations,
+                initial_state=state)
+        except Exception as e:
+            AngrCfgExtractorEmulated.log.warning("CFGEmulated @ %s+%#x failed [%s]" % (proj.filename, addr, repr(e)))
+            if str(e) == "OOM":
+                gc.collect()
+            cfg = None
 
         should_stop_closure = True
         t.join()
@@ -153,21 +162,12 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         if addr % 2 == 0 and AngrCfgExtractor.is_thumb(proj, addr):
             addr += 1
 
-        # We are accurate, but with an incomplete graph
-        # NOTE: keep_state=True is necessary, otherwise
-        #       SimProcedures are not called
-        try:
-            cfg = self._internal_get_cfg(
-                proj,
-                addr,
-                state,
-                max_time=self.timeout if self.use_timeout_for_cfg else None,
-                max_memory=self.max_memory)
-        except Exception as e:
-            AngrCfgExtractorEmulated.log.warning("CFGEmulated @ %s+%#x failed [%s]" % (proj.filename, addr, repr(e)))
-            if str(e) == "OOM":
-                gc.collect()
-            cfg = None
+        cfg = self._internal_get_cfg(
+            proj,
+            addr,
+            state,
+            max_time=self.timeout if self.use_timeout_for_cfg else None,
+            max_memory=self.max_memory)
         return cfg
 
     @staticmethod
