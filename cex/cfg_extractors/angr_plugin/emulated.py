@@ -65,6 +65,21 @@ class memcpyWrapper(angr.procedures.libc.memcpy.memcpy):
             limit = max_malloc_size
         return super().run(dst_addr, src_addr, limit)
 
+class ASensorManager_createEventQueue(angr.SimProcedure):
+    def run(self, manager, looper, ident, callback, _data):
+        fd     = self.state.solver.BVS("fd", 32)
+        events = self.state.solver.BVS("events", 32)
+        data   = self.state.heap._malloc(32)
+
+        self.call(callback, (fd, events, data), 'terminate_thread')
+        self.ret(
+            # struct ASensorEventQueue* (The size is wrong, I should check the exact size)
+            self.state.solver.BVV(self.state.heap._malloc(256),
+            self.state.arch.bits))
+
+    def terminate_thread(self, *args):
+        self.exit(0)
+
 class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
     log = logging.getLogger("cex.AngrCfgExtractorEmulated")
     # log.setLevel(logging.INFO)
@@ -153,6 +168,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         AngrCfgExtractorEmulated._hook_if_present(proj, "calloc", calloc())
         AngrCfgExtractorEmulated._hook_if_present(proj, "memset", memsetWrapper())
         AngrCfgExtractorEmulated._hook_if_present(proj, "memcpy", memcpyWrapper())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "ASensorManager_createEventQueue", ASensorManager_createEventQueue())
 
         if addr in self._state_constructors:
             state = self._state_constructors[addr](proj)
