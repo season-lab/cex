@@ -65,6 +65,12 @@ class memcpyWrapper(angr.procedures.libc.memcpy.memcpy):
             limit = max_malloc_size
         return super().run(dst_addr, src_addr, limit)
 
+class memmoveWrapper(angr.procedures.libc.memcpy.memcpy):
+    def run(self, dst_addr, src_addr, limit):
+        if not self.state.solver.symbolic(limit) and self.state.solver.eval(limit) > max_malloc_size:
+            limit = max_malloc_size
+        return super().run(dst_addr, src_addr, limit)
+
 class ASensorManager_createEventQueue(angr.SimProcedure):
     def run(self, manager, looper, ident, callback, _data):
         fd     = self.state.solver.BVS("fd", 32)
@@ -168,6 +174,7 @@ class AngrCfgExtractorEmulated(AngrCfgExtractor, IMultilibCfgExtractor):
         AngrCfgExtractorEmulated._hook_if_present(proj, "calloc", calloc())
         AngrCfgExtractorEmulated._hook_if_present(proj, "memset", memsetWrapper())
         AngrCfgExtractorEmulated._hook_if_present(proj, "memcpy", memcpyWrapper())
+        AngrCfgExtractorEmulated._hook_if_present(proj, "memmove", memmoveWrapper())
         AngrCfgExtractorEmulated._hook_if_present(proj, "ASensorManager_createEventQueue", ASensorManager_createEventQueue())
 
         if addr in self._state_constructors:
