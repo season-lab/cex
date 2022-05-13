@@ -73,6 +73,9 @@ class CEXProject(object):
             if addr is not None:
                 if additional_cg_edges is not None:
                     res = add_cg_edges(res, additional_cg_edges)
+                if not res.has_node(addr):
+                    print_err("WARNING: address %s not found" % hex(addr))
+                    return nx.MultiDiGraph()
                 return res.subgraph(nx.dfs_postorder_nodes(res, addr)).copy()
             if additional_cg_edges is not None:
                 res = add_cg_edges(res, additional_cg_edges)
